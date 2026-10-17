@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Capítulo 3: Los Hilos del Sindicato</title>
+  <style>
+    :root {
+      --wood-dark: #3d2314;
+      --wood-light: #6e4226;
+      --board-green: #1b3829;
+      --board-dark: #11241a;
+      --paper: #f4ebd9;
+      --paper-aged: #e2d2b5;
+      --yarn-red: #dc2626;
+      --pin-red: #ef4444;
+      --hazard-yellow: #facc15;
+      --ink: #1e293b;
+      --gold: #d97706;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: #0c0a09;
+      background-image: radial-gradient(circle at 50% 20%, #291d16 0%, #090706 85%);
+      color: #f8fafc;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+      overflow-x: hidden;
+    }
+
+    /* Marco de madera estilo pizarrón de detective */
+    .detective-frame {
+      width: 100%;
+      max-width: 820px;
+      background: var(--board-green);
+      background-image: 
+        radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0),
+        radial-gradient(circle at 50% 40%, #244735 0%, #12261c 90%);
+      background-size: 18px 18px, 100% 100%;
+      border: 12px solid var(--wood-light);
+      outline: 4px solid var(--wood-dark);
+      border-radius: 10px;
+      box-shadow: 
+        inset 0 0 40px rgba(0, 0, 0, 0.85),
+        0 20px 50px rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Cinta amarilla policial estilo FIND EVIDENCE! */
+    .crime-tape-bar {
+      background: var(--hazard-yellow);
+      color: #111;
+      padding: 8px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      border-bottom: 4px solid #111;
+      background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 18px,
+        rgba(0, 0, 0, 0.12) 18px,
+        rgba(0, 0, 0, 0.12) 36px
+      );
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+
+    .tape-title {
+      font-size: 1.25rem;
+      color: #b91c1c;
+      text-shadow: 1px 1px 0px #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .top-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-family: system-ui, sans-serif;
+    }
+
+    .ctrl-btn {
+      background: #111;
+      color: var(--hazard-yellow);
+      border: 2px solid #111;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: transform 0.12s;
+    }
+
+    .ctrl-btn:active { transform: scale(0.95); }
+    .ctrl-btn.music-on {
+      background: #b91c1c;
+      color: #fff;
+      border-color: #fff;
+    }
+
+    /* Navegación de vistas (Entorno, Pizarrón, Mapa) */
+    .desk-nav {
+      display: flex;
+      background: #0f1f17;
+      border-bottom: 2px solid #2d4f3e;
+      padding: 8px 12px;
+      gap: 8px;
+    }
+
+    .nav-tab {
+      flex: 1;
+      background: #193326;
+      color: #cbd5e1;
+      border: 1px solid #355e49;
+      padding: 9px 10px;
+      border-radius: 6px;
+      font-family: system-ui, sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .nav-tab.active {
+      background: var(--paper);
+      color: #111;
+      border-color: var(--hazard-yellow);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+
+    .board-Stage {
+      padding: 16px;
+      min-height: 490px;
+      position: relative;
+    }
+
+    /* Tarjetas Polaroid */
+    .polaroid-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      position: relative;
+      z-index: 2;
+      padding: 10px 4px;
+    }
+
+    @media (max-width: 620px) {
+      .polaroid-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+    }
+
+    .polaroid {
+      background: var(--paper);
+      color: var(--ink);
+      padding: 10px 10px 14px 10px;
+      border-radius: 3px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.65);
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+
+    .polaroid:nth-child(odd) { transform: rotate(-1.8deg); }
+    .polaroid:nth-child(even) { transform: rotate(1.6deg); }
+    .polaroid:hover {
+      transform: scale(1.03) rotate(0deg);
+      z-index: 5;
+    }
+
+    /* Tachuela Roja Interactiva */
+    .red-pin {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ff7b7b, #dc2626 60%, #7f1d1d 100%);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.6);
+      position: absolute;
+      top: -8px;
+      left: calc(50% - 12px);
+      z-index: 10;
+      cursor: pointer;
+      border: 2px solid #fff;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .red-pin.selected {
+      transform: scale(1.35);
+      box-shadow: 0 0 14px #facc15, 0 0 22px #dc2626;
+      border-color: var(--hazard-yellow);
+    }
+
+    .polaroid-art {
+      width: 100%;
+      height: 105px;
+      background: #262626;
+      border: 1px solid #94a3b8;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .polaroid-caption {
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-align: center;
+      color: #1e293b;
+      line-height: 1.25;
+    }
+
+    /* Capa SVG de Hilos Rojos sobre el pizarrón */
+    .yarn-svg-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    /* Escena Ilustrada Interactiva (Point & Click) */
+    .scene-canvas-box {
+      width: 100%;
+      background: #14110f;
+      border: 3px solid var(--paper-aged);
+      border-radius: 6px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.7);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hotspot {
+      cursor: pointer;
+      transition: filter 0.2s, transform 0.2s;
+    }
+
+    .hotspot:hover {
+      filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.85)) brightness(1.15);
+    }
+
+    /* Modal / Inspector de Pistas en primer plano */
+    .clue-drawer {
+      margin-top: 12px;
+      background: var(--paper);
+      color: var(--ink);
+      border: 2px solid #78350f;
+      border-radius: 6px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+      font-family: 'Courier New', monospace;
+    }
+
+    .clue-drawer h3 {
+      font-size: 1rem;
+      color: #7f1d1d;
+      margin-bottom: 6px;
+      border-bottom: 1px dashed #78350f;
+      padding-bottom: 4px;
+    }
+
+    .clue-drawer p {
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: #1e293b;
+    }
+
+    /* Botones de acción en el expediente */
+    .action-btn {
+      background: #991b1b;
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 5px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      font-size: 0.86rem;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    .action-btn:hover { background: #b91c1c; }
+
+    .dial-input {
+      background: #1e293b;
+      color: var(--hazard-yellow);
+      border: 2px solid #475569;
+      padding: 7px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: center;
+      width: 68px;
+    }
+
+    /* Mapa Táctico Interactivo */
+    .map-node {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .map-node:hover {
+      transform: scale(1.15);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="detective-frame">
+    <!-- Cinta Policial Superior -->
+    <div class="crime-tape-bar">
+      <div class="tape-title">
+        <span>🕵️‍♂️ FIND EVIDENCE!</span>
+        <span id="roleTitleBadge" style="font-size:0.9rem; background:#111; color:#facc15; padding:2px 8px; border-radius:4px;">CASO #8421</span>
+      </div>
+      <div class="top-controls">
+        <button id="musicBtn" class="ctrl-btn" onclick="toggleMusic()">🎵 Música: OFF</button>
+        <button class="ctrl-btn" onclick="resetAll()">🔄 Reiniciar</button>
+      </div>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <div id="mainView"></div>
+  </div>
+
+  <script>
+    // =========================================================
+    // 1. MOTOR MUSICAL DETECTIVE NOIR (Web Audio API Sintetizado)
+    // =========================================================
+    let audioCtx = null;
+    let musicPlaying = false;
+    let musicTimer = null;
+    let stepIndex = 0;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playSfx(type) {
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'pin') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(720, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      } else if (type === 'yarn') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.linearRampToValueAtTime(540, now + 0.14);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else if (type === 'unlock') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(554.37, now + 0.1);
+        osc.frequency.setValueAtTime(659.25, now + 0.2);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      } else if (type === 'error') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(130, now);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+    }
+
+    // Secuencia de Jazz Noir en La Menor (Walking Bass + Acordes de Piano Eléctrico)
+    const bassLine = [110, 130.81, 146.83, 155.56, 146.83, 130.81, 123.47, 98.00];
+    const chordProg = [
+      [220, 261.63, 329.63, 392.00], // Am7
+      [146.83, 220, 293.66, 349.23], // Dm7
+      [164.81, 246.94, 311.13, 392], // E7
+      [220, 261.63, 329.63, 440.00]  // Am
+    ];
+
+    function playNoirStep() {
+      if (!musicPlaying || !audioCtx) return;
+      const now = audioCtx.currentTime;
+
+      // Walking Bass
+      const bOsc = audioCtx.createOscillator();
+      const bGain = audioCtx.createGain();
+      bOsc.type = 'triangle';
+      const freq = bassLine[stepIndex % bassLine.length];
+      bOsc.frequency.setValueAtTime(freq, now);
+      bGain.gain.setValueAtTime(0.06, now);
+      bGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+      bOsc.connect(bGain);
+      bGain.connect(audioCtx.destination);
+      bOsc.start(now);
+      bOsc.stop(now + 0.45);
+
+      // Acorde suave de misterio cada 4 tiempos
+      if (stepIndex % 4 === 0) {
+        const chord = chordProg[Math.floor(stepIndex / 4) % chordProg.length];
+        chord.forEach(noteFreq => {
+          const cOsc = audioCtx.createOscillator();
+          const cGain = audioCtx.createGain();
+          cOsc.type = 'sine';
+          cOsc.frequency.setValueAtTime(noteFreq, now);
+          cGain.gain.setValueAtTime(0.018, now);
+          cGain.gain.exponentialRampToValueAtTime(0.0008, now + 1.6);
+          cOsc.connect(cGain);
+          cGain.connect(audioCtx.destination);
+          cOsc.start(now);
+          cOsc.stop(now + 1.65);
+        });
+      }
+
+      stepIndex++;
+    }
+
+    function toggleMusic() {
+      initAudio();
+      musicPlaying = !musicPlaying;
+      const btn = document.getElementById('musicBtn');
+      if (musicPlaying) {
+        btn.textContent = '🎵 Música: ON';
+        btn.classList.add('music-on');
+        playNoirStep();
+        musicTimer = setInterval(playNoirStep, 520);
+      } else {
+        btn.textContent = '🎵 Música: OFF';
+        btn.classList.remove('music-on');
+        if (musicTimer) clearInterval(musicTimer);
+      }
+    }
+
+    // =========================================================
+    // 2. ESTADO DEL JUEGO (SIN INSTRUCCIONES META)
+    // =========================================================
+    let state = {
+      role: null,        // 'P1' o 'P2'
+      view: 'SCENE',     // 'SCENE' (Entorno), 'BOARD' (Pizarrón Hilos), 'MAP' (Mapa Ciudad)
+      inspectedId: null, // Objeto actualmente seleccionado en la escena
+
+      // Interacciones en el entorno P1
+      catMovedP1: false,
+      curtainOpenP1: false,
+      safeUnlockedP1: false, // Se abre con 7-3-9-2
+      safeInputP1: ['0', '0', '0', '0'],
+
+      // Interacciones en el entorno P2
+      potDustedP2: false,
+      clockUnlockedP2: false, // Se abre con III - VI - VIII - XII
+      clockInputP2: ['I', 'I', 'I', 'I'],
+
+      // Pizarrón de Hilos Rojos (Ambos pueden unir tachuelas)
+      selectedPin: null,
+      yarnLinks: [], // Pares '0-3', etc.
+      boardSolved: false,
+
+      // Mapa Táctico Final
+      selectedMapBuilding: null,
+      raidSuspect: '',
+      raidWeapon: '',
+      caseWon: false
+    };
+
+    function resetAll() {
+      playSfx('pin');
+      state.role = null;
+      state.view = 'SCENE';
+      state.inspectedId = null;
+      state.catMovedP1 = false;
+      state.curtainOpenP1 = false;
+      state.safeUnlockedP1 = false;
+      state.safeInputP1 = ['0', '0', '0', '0'];
+      state.potDustedP2 = false;
+      state.clockUnlockedP2 = false;
+      state.clockInputP2 = ['I', 'I', 'I', 'I'];
+      state.selectedPin = null;
+      state.yarnLinks = [];
+      state.boardSolved = false;
+      state.selectedMapBuilding = null;
+      state.caseWon = false;
+      render();
+    }
+
+    function pickRole(r) {
+      playSfx('unlock');
+      state.role = r;
+      state.view = 'SCENE';
+      state.inspectedId = null;
+      if (!musicPlaying) toggleMusic();
+      render();
+    }
+
+    function setView(v) {
+      playSfx('pin');
+      state.view = v;
+      state.selectedPin = null;
+      render();
+      if (v === 'BOARD') setTimeout(drawYarnLines, 40);
+    }
+
+    // =========================================================
+    // 3. RENDERIZADO PRINCIPAL
+    // =========================================================
+    function render() {
+      const root = document.getElementById('mainView');
+      const badge = document.getElementById('roleTitleBadge');
+
+      if (!state.role) {
+        badge.textContent = 'SELECCIÓN DE EXPEDIENTE';
+        root.innerHTML = `
+          <div class="board-Stage" style="text-align:center;">
+            <h1 style="color:var(--hazard-yellow); font-size:1.6rem; margin-bottom:8px;">Capítulo 3: Los Hilos del Sindicato</h1>
+            <p style="max-width:600px; margin:0 auto 18px; color:#e2e8f0; font-size:0.95rem;">
+              El jefe del Sindicato Espectro planea huir de Puerto Viejo esta noche a las <strong>23:45</strong>. No hay notas que les digan qué hacer: exploren cada rincón de la habitación, conecten las pruebas con hilo rojo en el pizarrón y rastreen el mapa de la ciudad.
+            </p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px; max-width:640px; margin:0 auto;">
+              <div class="polaroid" onclick="pickRole('P1')" style="transform:rotate(-1.5deg);">
+                <div class="red-pin"></div>
+                <div class="polaroid-art" style="background:#2b1810;">
+                  <svg viewBox="0 0 200 110" width="100%" height="100%">
+                    <rect width="200" height="110" fill="#2b1810"/>
+                    <path d="M140,0 L185,0 L175,110 L130,110 Z" fill="#991b1b"/>
+                    <circle cx="55" cy="70" r="22" fill="#111"/>
+                    <polygon points="40,55 46,38 55,52" fill="#111"/>
+                    <polygon points="70,55 64,38 55,52" fill="#111"/>
+                    <circle cx="49" cy="66" r="3" fill="#facc15"/>
+                    <circle cx="61" cy="66" r="3" fill="#facc15"/>
+                    <path d="M115,35 L115,95" stroke="#a855f7" stroke-width="6" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <div class="polaroid-caption">
+                  EXPEDIENTE "A"<br>
+                  <span style="color:#991b1b;">Salón del Ático</span>
+                </div>
+              </div>
+
+              <div class="polaroid" onclick="pickRole('P2')" style="transform:rotate(1.5deg);">
+                <div class="red-pin"></div>
+                <div class="polaroid-art" style="background:#17252a;">
+                  <svg viewBox="0 0 200 110" width="100%" height="100%">
+                    <rect width="200" height="110" fill="#17252a"/>
+                    <circle cx="140" cy="55" r="36" fill="#fef3c7" stroke="#b45309" stroke-width="5"/>
+                    <line x1="140" y1="55" x2="140" y2="28" stroke="#111" stroke-width="3"/>
+                    <line x1="140" y1="55" x2="162" y2="55" stroke="#b91c1c" stroke-width="3"/>
+                    <rect x="25" y="25" width="55" height="65" fill="#fde68a" stroke="#92400e" stroke-width="2"/>
+                    <ellipse cx="42" cy="45" rx="7" ry="10" fill="#57534e"/>
+                    <ellipse cx="62" cy="45" rx="7" ry="10" fill="#57534e"/>
+                    <ellipse cx="52" cy="68" rx="7" ry="10" fill="#57534e"/>
+                  </svg>
+                </div>
+                <div class="polaroid-caption">
+                  EXPEDIENTE "B"<br>
+                  <span style="color:#0f766e;">Taller de Relojería</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      badge.textContent = state.role === 'P1' ? 'EXPEDIENTE A: SALÓN DEL ÁTICO' : 'EXPEDIENTE B: TALLER DE RELOJERÍA';
+
+      if (state.caseWon) {
+        root.innerHTML = `
+          <div class="board-Stage" style="text-align:center; padding:30px 16px;">
+            <div style="font-size:3.5rem; margin-bottom:10px;">🚨🚓🚨</div>
+            <h1 style="color:var(--hazard-yellow); margin-bottom:10px;">¡CASO CERRADO EN PUERTO VIEJO!</h1>
+            <div class="clue-drawer" style="max-width:560px; margin:0 auto 20px; text-align:left;">
+              <h3>ACTA POLICIAL DE CAPTURA</h3>
+              <p>
+                Las unidades tácticas interceptaron a <strong>Victoriano "El Conde" Vane (Huella Tipo Espiral)</strong> a las 23:40 en el <strong>Almacén Kronos (Sector C-4)</strong> antes de abordar el último tranvía de carga.<br><br>
+                Se recuperó el estuche con la <strong>Daga Ceremonial</strong> y los registros completos del Sindicato.
+              </p>
+            </div>
+            <button class="action-btn" onclick="resetAll()">Jugar de Nuevo / Intercambiar Pantallas</button>
+          </div>
+        `;
+        return;
+      }
+
+      const navHtml = `
+        <div class="desk-nav">
+          <button class="nav-tab ${state.view === 'SCENE' ? 'active' : ''}" onclick="setView('SCENE')">
+            🔍 Habitación (Entorno)
+          </button>
+          <button class="nav-tab ${state.view === 'BOARD' ? 'active' : ''}" onclick="setView('BOARD')">
+            📌 Pizarrón de Hilos ${state.boardSolved ? '✅' : ''}
+          </button>
+          <button class="nav-tab ${state.view === 'MAP' ? 'active' : ''}" onclick="setView('MAP')">
+            🗺️ Mapa de la Ciudad
+          </button>
+        </div>
+      `;
+
+      let bodyHtml = '';
+      if (state.view === 'SCENE') {
+        bodyHtml = state.role === 'P1' ? buildSceneP1() : buildSceneP2();
+      } else if (state.view === 'BOARD') {
+        bodyHtml = buildCorkboard();
+      } else {
+        bodyHtml = buildCityMap();
+      }
+
+      root.innerHTML = navHtml + `<div class="board-Stage">${bodyHtml}</div>`;
+    }
+
+    // =========================================================
+    // 4. ESCENA ILUSTRADA P1 (Gato Negro, Paraguas, Cortina, Caja Fuerte)
+    // =========================================================
+    function buildSceneP1() {
+      let inspectorHtml = `<div class="clue-drawer"><h3>INSPECCIÓN DEL ENTORNO</h3><p>Toca cualquier objeto de la habitación (el gato negro, el paraguas, la cortina roja, la lámpara o el maletín blindado) para examinarlo de cerca.</p></div>`;
+
+      if (state.inspectedId === 'cat') {
+        inspectorHtml = `
+          <div class="clue-drawer">
+            <h3>🐈‍⬛ Gato Negro y Recorte de Diario</h3>
+            <p>${state.catMovedP1 
+              ? 'Al acariciar al gato, se movió dejando ver un grabado en el collar de bronce: <strong>[ 🐱 = III ]</strong>. Debajo hay una nota de lavandería: <em>"El sospechoso dejó barro de las vías del <strong>Tranvía Línea Roja (23:45)</strong>"</em>.' 
+              : 'Un gato negro descansa sobre unos papeles antiguos.'}</p>
+          </div>`;
+      } else if (state.inspectedId === 'umbrella') {
+        inspectorHtml = `
+          <div class="clue-drawer">
+            <h3>☂️ Paraguas Morado y Lámpara</h3>
+            <p>El mango del paraguas morado tiene tallado en metal: <strong>[ ☂️ = VI ]</strong>.<br>
+            En la base de la lámpara de aceite de al lado se distingue otro grabado: <strong>[ 🕰️ = XII ]</strong>.</p>
+          </div>`;
+      } else if (state.inspectedId === 'curtain') {
+        inspectorHtml = `
+          <div class="clue-drawer">
+            <h3>🗡️ Detrás de la Cortina Carmesí</h3>
+            <p>Al recorrer la cortina roja descubres un pergamino clavado en la pared con el dibujo de una <strong>Espada Antigua</strong> y el número romano: <strong>[ 🗡️ = VIII ]</strong>.</p>
+          </div>`;
+      } else if (state.inspectedId === 'safe') {
+        if (!state.safeUnlockedP1) {
+          inspectorHtml = `
+            <div class="clue-drawer">
+              <h3>💼 Maletín Forense con Candado de 4 Palos</h3>
+              <p>Tiene grabados los 4 palos de la baraja en orden: <strong>♠ Picas — ♥ Corazones — ♦ Diamantes — ♣ Tréboles</strong>.</p>
+              <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+                <span>♠</span><input class="dial-input" id="s0" maxlength="1" value="${state.safeInputP1[0]}"/>
+                <span>♥</span><input class="dial-input" id="s1" maxlength="1" value="${state.safeInputP1[1]}"/>
+                <span>♦</span><input class="dial-input" id="s2" maxlength="1" value="${state.safeInputP1[2]}"/>
+                <span>♣</span><input class="dial-input" id="s3" maxlength="1" value="${state.safeInputP1[3]}"/>
+                <button class="action-btn" onclick="checkSafeP1()">Abrir Candado</button>
+              </div>
+            </div>`;
+        } else {
+          inspectorHtml = `
+            <div class="clue-drawer">
+              <h3>📂 Interior del Maletín Forense (ABIERTO)</h3>
+              <p>• <strong>Ficha de Huellas Dactilares (3x2):</strong><br>
+              &nbsp;&nbsp;- Casilla Superior-Izquierda (<strong>ESPIRAL</strong>): Pertenece a <strong>Victoriano "El Conde" Vane</strong>.<br>
+              &nbsp;&nbsp;- Casilla Central (<strong>ARCO</strong>): Pertenece a <strong>Madame Moreau</strong>.<br>
+              &nbsp;&nbsp;- Casilla Inferior-Derecha (<strong>LAZO</strong>): Pertenece a <strong>Capitán Kross</strong>.<br>
+              • <strong>Regla del Pizarrón:</strong> En el pizarrón de evidencias deben unirse con hilo rojo los 3 pares de fotos que comparten el mismo número de lote: <strong>(Lote #14 con Lote #14)</strong>, <strong>(Lote #27 con Lote #27)</strong> y <strong>(Lote #89 con Lote #89)</strong>.</p>
+            </div>`;
+        }
+      }
+
+      const catX = state.catMovedP1 ? 145 : 85;
+      const curtainW = state.curtainOpenP1 ? 35 : 85;
+
+      return `
+        <div class="scene-canvas-box">
+          <svg viewBox="0 0 600 270" width="100%" style="display:block;">
+            <!-- Pared y Suelo del Ático -->
+            <rect width="600" height="200" fill="#231c18"/>
+            <rect y="200" width="600" height="70" fill="#3b2618"/>
+            <!-- Ventana Nocturna -->
+            <rect x="220" y="25" width="130" height="120" fill="#0f172a" stroke="#5c4033" stroke-width="6"/>
+            <circle cx="260" cy="60" r="14" fill="#fef08a" opacity="0.8"/>
+
+            <!-- Pergamino oculto detrás de la cortina (Espada = VIII) -->
+            <g class="hotspot" onclick="inspectP1('curtain')">
+              <rect x="435" y="45" width="65" height="90" fill="#e2d2b5" stroke="#78350f" stroke-width="2"/>
+              <line x1="467" y1="60" x2="467" y2="110" stroke="#1e293b" stroke-width="3"/>
+              <line x1="453" y1="75" x2="481" y2="75" stroke="#1e293b" stroke-width="3"/>
+              <text x="448" y="128" fill="#7f1d1d" font-size="13" font-weight="bold">VIII</text>
+            </g>
+
+            <!-- Cortina Roja Interactiva -->
+            <g class="hotspot" onclick="inspectP1('curtain')">
+              <rect x="425" y="15" width="${curtainW}" height="185" fill="#991b1b" stroke="#450a0a" stroke-width="2"/>
+              <path d="M425,15 Q445,100 425,200" fill="none" stroke="#dc2626" stroke-width="3"/>
+            </g>
+
+            <!-- Paraguas Morado y Lámpara de Aceite (Como en la imagen) -->
+            <g class="hotspot" onclick="inspectP1('umbrella')">
+              <!-- Lámpara -->
+              <ellipse cx="545" cy="195" rx="20" ry="8" fill="#d97706"/>
+              <path d="M535,195 L540,155 L550,155 L555,195 Z" fill="#f59e0b"/>
+              <circle cx="545" cy="145" r="12" fill="#fef08a" opacity="0.75"/>
+              <!-- Paraguas Morado -->
+              <path d="M505,115 L518,205 L492,205 Z" fill="#7e22ce" stroke="#581c87" stroke-width="2"/>
+              <path d="M505,95 L505,115 Q505,85 516,92" fill="none" stroke="#d97706" stroke-width="4"/>
+              <circle cx="505" cy="155" r="24" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3"/>
+            </g>
+
+            <!-- Mesa con Papeles y Gato Negro -->
+            <rect x="40" y="165" width="170" height="18" fill="#5c3a21"/>
+            <rect x="55" y="183" width="14" height="65" fill="#3d2314"/>
+            <rect x="180" y="183" width="14" height="65" fill="#3d2314"/>
+            <!-- Papel debajo del gato -->
+            <rect x="70" y="155" width="55" height="12" fill="#f4ebd9" transform="rotate(-4 70 155)"/>
+            <text x="76" y="164" fill="#b91c1c" font-size="9" font-weight="bold">🐱=III</text>
+
+            <!-- Gato Negro Interactivo -->
+            <g class="hotspot" onclick="inspectP1('cat')" style="transition: transform 0.35s;" transform="translate(${catX}, 115)">
+              <ellipse cx="25" cy="36" rx="18" ry="22" fill="#111"/>
+              <circle cx="25" cy="12" r="13" fill="#111"/>
+              <polygon points="14,6 17,-6 24,4" fill="#111"/>
+              <polygon points="36,6 33,-6 26,4" fill="#111"/>
+              <circle cx="20" cy="11" r="2.6" fill="#facc15"/>
+              <circle cx="30" cy="11" r="2.6" fill="#facc15"/>
+              <path d="M40,48 Q58,42 54,26" fill="none" stroke="#111" stroke-width="5" stroke-linecap="round"/>
+            </g>
+
+            <!-- Maletín Forense con Candado (Centro) -->
+            <g class="hotspot" onclick="inspectP1('safe')">
+              <rect x="255" y="175" width="95" height="65" rx="6" fill="${state.safeUnlockedP1 ? '#15803d' : '#78350f'}" stroke="#facc15" stroke-width="3"/>
+              <rect x="288" y="165" width="30" height="10" fill="none" stroke="#d97706" stroke-width="3"/>
+              <text x="268" y="212" fill="#fff" font-family="monospace" font-size="12" font-weight="bold">♠ ♥ ♦ ♣</text>
+            </g>
+          </svg>
+        </div>
+        ${inspectorHtml}
+      `;
+    }
+
+    function inspectP1(id) {
+      playSfx('pin');
+      state.inspectedId = id;
+      if (id === 'cat') state.catMovedP1 = true;
+      if (id === 'curtain') state.curtainOpenP1 = !state.curtainOpenP1;
+      render();
+    }
+
+    function checkSafeP1() {
+      const v0 = document.getElementById('s0').value.trim();
+      const v1 = document.getElementById('s1').value.trim();
+      const v2 = document.getElementById('s2').value.trim();
+      const v3 = document.getElementById('s3').value.trim();
+      state.safeInputP1 = [v0, v1, v2, v3];
+
+      if (v0 === '7' && v1 === '3' && v2 === '9' && v3 === '2') {
+        playSfx('unlock');
+        state.safeUnlockedP1 = true;
+        render();
+      } else {
+        playSfx('error');
+        alert('El candado no cede. Esos no son los dígitos de ♠ ♥ ♦ ♣.');
+      }
+    }
+
+    // =========================================================
+    // 5. ESCENA ILUSTRADA P2 (Vasija con Brocha, Reloj Romano, Palos)
+    // =========================================================
+    function buildSceneP2() {
+      let inspectorHtml = `<div class="clue-drawer"><h3>INSPECCIÓN DEL TALLER</h3><p>Toca los objetos del taller (la vasija con brocha forense, los cuadros de naipes, el plano de herramientas o el gran Reloj Romano) para examinarlos.</p></div>`;
+
+      if (state.inspectedId === 'pot') {
+        inspectorHtml = `
+          <div class="clue-drawer">
+            <h3>🖌️ Vasija de Arcilla y Polvo de Huellas</h3>
+            <p>Al pasar la brocha forense sobre la cerámica rota aparecen dos etiquetas ocultas:<br>
+            • Sello de Naipes: <strong>[ ♠ = 7 ]</strong> y <strong>[ ♥ = 3 ]</strong>.<br>
+            • La huella revelada en la vasija es de tipo <strong>ESPIRAL (Whorl)</strong>, encontrada junto a una factura del <strong>Almacén Kronos</strong>.</p>
+          </div>`;
+      } else if (state.inspectedId === 'blueprint') {
+        inspectorHtml = `
+          <div class="clue-drawer">
+            <h3>📜 Pergamino de Armas y Herramientas</h3>
+            <p>Un plano antiguo con el dibujo de una espátula y una <strong>Daga Ceremonial</strong>. En las esquinas inferiores tiene anotados los otros dos palos:<br>
+            • <strong>[ ♦ = 9 ]</strong> y <strong>[ ♣ = 2 ]</strong>.<br>
+            • Nota forense al margen: <em>"El corte en la cuerda del muelle fue hecho con una hoja de doble filo (Daga Ceremonial)"</em>.</p>
+          </div>`;
+      } else if (state.inspectedId === 'clock') {
+        if (!state.clockUnlockedP2) {
+          const romans = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+          const makeSelect = (idx) => `
+            <select id="c${idx}" class="dial-input" style="width:74px;">
+              ${romans.map(r => `<option value="${r}" ${state.clockInputP2[idx] === r ? 'selected' : ''}>${r}</option>`).join('')}
+            </select>
+          `;
+          inspectorHtml = `
+            <div class="clue-drawer">
+              <h3>🕰️ Reloj de Péndulo con 4 Engranajes Romanos</h3>
+              <p>Debajo de la esfera hay 4 ranuras con figuras grabadas:</p>
+              <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+                <span>🐱</span>${makeSelect(0)}
+                <span>☂️</span>${makeSelect(1)}
+                <span>🗡️</span>${makeSelect(2)}
+                <span>🕰️</span>${makeSelect(3)}
+                <button class="action-btn" onclick="checkClockP2()">Ajustar Reloj</button>
+              </div>
+            </div>`;
+        } else {
+          inspectorHtml = `
+            <div class="clue-drawer">
+              <h3>⚙️ Compartimento Secreto del Reloj (ABIERTO)</h3>
+              <p>• <strong>Índice de Lotes del Pizarrón:</strong><br>
+              &nbsp;&nbsp;- <strong>Lote #14:</strong> Foto del <em>Gato Negro</em> y Foto del <em>Recibo del Tranvía</em>.<br>
+              &nbsp;&nbsp;- <strong>Lote #27:</strong> Foto de la <em>Vasija con Brocha</em> y Foto del <em>Paraguas Morado</em>.<br>
+              &nbsp;&nbsp;- <strong>Lote #89:</strong> Foto del <em>Reloj Romano</em> y Foto del <em>Plano de la Daga</em>.<br>
+              • <strong>Reporte de Radio:</strong> La señal del sospechoso se originó dentro del radio de alcance de la <strong>Torre del Reloj (Sector Sur)</strong>.</p>
+            </div>`;
+        }
+      }
+
+      return `
+        <div class="scene-canvas-box">
+          <svg viewBox="0 0 600 270" width="100%" style="display:block;">
+            <rect width="600" height="200" fill="#16262e"/>
+            <rect y="200" width="600" height="70" fill="#291d16"/>
+
+            <!-- Mesa de Laboratorio Izquierda: Vasija y Brocha Forense (Como en la imagen) -->
+            <g class="hotspot" onclick="inspectP2('pot')">
+              <rect x="35" y="130" width="150" height="80" fill="#1e293b" stroke="#64748b" stroke-width="3"/>
+              <!-- Vasija de arcilla -->
+              <path d="M85,145 Q70,175 85,198 L125,198 Q140,175 125,145 Z" fill="#c27863" stroke="#7c2d12" stroke-width="2"/>
+              <!-- Brocha forense con guante azul -->
+              <line x1="145" y1="135" x2="118" y2="162" stroke="#f59e0b" stroke-width="5"/>
+              <circle cx="115" cy="165" r="7" fill="#e2e8f0"/>
+              <text x="52" y="122" fill="#facc15" font-family="monospace" font-size="11">♠=7 | ♥=3</text>
+            </g>
+
+            <!-- Centro: Pergamino con Espátula y Espada/Daga (Como en la imagen) -->
+            <g class="hotspot" onclick="inspectP2('blueprint')">
+              <rect x="235" y="45" width="120" height="135" fill="#e2d2b5" stroke="#78350f" stroke-width="3"/>
+              <!-- Dibujo Espátula -->
+              <rect x="260" y="65" width="22" height="26" fill="none" stroke="#334155" stroke-width="2"/>
+              <line x1="271" y1="91" x2="271" y2="145" stroke="#334155" stroke-width="3"/>
+              <!-- Dibujo Daga/Espada -->
+              <polygon points="315,60 322,75 315,130 308,75" fill="none" stroke="#334155" stroke-width="2"/>
+              <line x1="300" y1="130" x2="330" y2="130" stroke="#334155" stroke-width="3"/>
+              <line x1="315" y1="130" x2="315" y2="155" stroke="#334155" stroke-width="4"/>
+              <text x="255" y="170" fill="#7f1d1d" font-family="monospace" font-size="12" font-weight="bold">♦=9 | ♣=2</text>
+            </g>
+
+            <!-- Derecha: Gran Reloj Romano (Como en la imagen) -->
+            <g class="hotspot" onclick="inspectP2('clock')">
+              <circle cx="485" cy="115" r="68" fill="#fef3c7" stroke="#b45309" stroke-width="8"/>
+              <circle cx="485" cy="115" r="56" fill="none" stroke="#92400e" stroke-width="1" stroke-dasharray="4,4"/>
+              <text x="475" y="65" fill="#1e293b" font-size="14" font-weight="bold">XII</text>
+              <text x="530" y="120" fill="#1e293b" font-size="14" font-weight="bold">III</text>
+              <text x="478" y="172" fill="#1e293b" font-size="14" font-weight="bold">VI</text>
+              <text x="430" y="120" fill="#1e293b" font-size="14" font-weight="bold">IX</text>
+              <line x1="485" y1="115" x2="485" y2="75" stroke="#d97706" stroke-width="4"/>
+              <line x1="485" y1="115" x2="520" y2="135" stroke="#991b1b" stroke-width="3"/>
+              <circle cx="485" cy="115" r="5" fill="#111"/>
+              <text x="442" y="210" fill="${state.clockUnlockedP2 ? '#4ade80' : '#facc15'}" font-family="monospace" font-size="12" font-weight="bold">
+                ${state.clockUnlockedP2 ? '[RELOJ ABIERTO]' : '🐱 ☂️ 🗡️ 🕰️'}
+              </text>
+            </g>
+          </svg>
+        </div>
+        ${inspectorHtml}
+      `;
+    }
+
+    function inspectP2(id) {
+      playSfx('pin');
+      state.inspectedId = id;
+      if (id === 'pot') state.potDustedP2 = true;
+      render();
+    }
+
+    function checkClockP2() {
+      const c0 = document.getElementById('c0').value;
+      const c1 = document.getElementById('c1').value;
+      const c2 = document.getElementById('c2').value;
+      const c3 = document.getElementById('c3').value;
+      state.clockInputP2 = [c0, c1, c2, c3];
+
+      if (c0 === 'III' && c1 === 'VI' && c2 === 'VIII' && c3 === 'XII') {
+        playSfx('unlock');
+        state.clockUnlockedP2 = true;
+        render();
+      } else {
+        playSfx('error');
+        alert('Los engranajes se traban. Esa no es la combinación romana de 🐱 ☂️ 🗡️ 🕰️.');
+      }
+    }
+
+    // =========================================================
+    // 6. PIZARRÓN INTERACTIVO CON HILOS ROJOS (Igual a la imagen)
+    // =========================================================
+    function buildCorkboard() {
+      const cards = [
+        { id: 0, title: 'Evidencia A: Gato Negro', sub: 'Hallado sobre notas', icon: '🐈‍⬛' },
+        { id: 1, title: 'Evidencia B: Vasija y Brocha', sub: 'Huella tipo Espiral', icon: '🏺' },
+        { id: 2, title: 'Evidencia C: Reloj Romano', sub: 'Mecanismo de bronce', icon: '🕰️' },
+        { id: 3, title: 'Evidencia D: Boleto Tranvía', sub: 'Salida 23:45 hrs', icon: '🎟️' },
+        { id: 4, title: 'Evidencia E: Paraguas Morado', sub: 'Cortina del Ático', icon: '☂️' },
+        { id: 5, title: 'Evidencia F: Plano de la Daga', sub: 'Hoja de doble filo', icon: '🗡️' }
+      ];
+
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <span style="font-family:system-ui, sans-serif; font-size:0.88rem; color:#fde68a;">
+            📌 <strong>Toca una tachuela roja y luego otra</strong> para atar o quitar un hilo rojo entre dos pruebas:
+          </span>
+          <button class="ctrl-btn" onclick="clearYarn()">✂️ Cortar Hilos</button>
+        </div>
+
+        <div id="boardContainer" style="position:relative;">
+          <svg id="yarnSvg" class="yarn-svg-layer"></svg>
+          <div class="polaroid-grid">
+            ${cards.map((c, idx) => `
+              <div class="polaroid" id="card_${idx}" onclick="clickPin(${idx})">
+                <div class="red-pin ${state.selectedPin === idx ? 'selected' : ''}" id="pin_${idx}"></div>
+                <div class="polaroid-art">
+                  <span style="font-size:2.8rem;">${c.icon}</span>
+                </div>
+                <div class="polaroid-caption">
+                  ${c.title}<br>
+                  <span style="font-weight:normal; color:#475569;">${c.sub}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        ${state.boardSolved ? `
+          <div class="clue-drawer" style="border-color:#15803d; background:#dcfce7;">
+            <h3 style="color:#166534;">✅ CONEXIÓN FORENSE CONFIRMADA</h3>
+            <p>Al cruzar los tres pares de hilos rojos correctamente, descubren la intersección exacta:<br>
+            El culpable se oculta en el edificio que cumple las 3 pistas en el <strong>Mapa de la Ciudad</strong>: conectado a la <strong>Línea Roja del Tranvía (23:45)</strong> y dentro del perímetro de la <strong>Torre del Reloj (Sector Sur)</strong>.</p>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    function clickPin(idx) {
+      playSfx('pin');
+      if (state.selectedPin === null) {
+        state.selectedPin = idx;
+      } else if (state.selectedPin === idx) {
+        state.selectedPin = null;
+      } else {
+        const a = Math.min(state.selectedPin, idx);
+        const b = Math.max(state.selectedPin, idx);
+        const key = `${a}-${b}`;
+        const existing = state.yarnLinks.indexOf(key);
+        playSfx('yarn');
+        if (existing >= 0) {
+          state.yarnLinks.splice(existing, 1);
+        } else {
+          state.yarnLinks.push(key);
+        }
+        state.selectedPin = null;
+        checkBoardLinks();
+      }
+      render();
+      setTimeout(drawYarnLines, 20);
+    }
+
+    function clearYarn() {
+      playSfx('pin');
+      state.yarnLinks = [];
+      state.selectedPin = null;
+      state.boardSolved = false;
+      render();
+    }
+
+    function checkBoardLinks() {
+      // Pares correctos: Lote #14 (0-3: Gato y Tranvía), Lote #27 (1-4: Vasija y Paraguas), Lote #89 (2-5: Reloj y Daga)
+      const target = ['0-3', '1-4', '2-5'];
+      if (state.yarnLinks.length === 3 && target.every(k => state.yarnLinks.includes(k))) {
+        playSfx('unlock');
+        state.boardSolved = true;
+      } else {
+        state.boardSolved = false;
+      }
+    }
+
+    function drawYarnLines() {
+      const svg = document.getElementById('yarnSvg');
+      const container = document.getElementById('boardContainer');
+      if (!svg || !container) return;
+      const cRect = container.getBoundingClientRect();
+      svg.innerHTML = '';
+
+      state.yarnLinks.forEach(pair => {
+        const [a, b] = pair.split('-').map(Number);
+        const pinA = document.getElementById(`pin_${a}`);
+        const pinB = document.getElementById(`pin_${b}`);
+        if (!pinA || !pinB) return;
+
+        const rA = pinA.getBoundingClientRect();
+        const rB = pinB.getBoundingClientRect();
+
+        const x1 = rA.left - cRect.left + rA.width / 2;
+        const y1 = rA.top - cRect.top + rA.height / 2;
+        const x2 = rB.left - cRect.left + rB.width / 2;
+        const y2 = rB.top - cRect.top + rB.height / 2;
+
+        // Sombra del hilo
+        const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        shadow.setAttribute('x1', x1);
+        shadow.setAttribute('y1', y1 + 4);
+        shadow.setAttribute('x2', x2);
+        shadow.setAttribute('y2', y2 + 4);
+        shadow.setAttribute('stroke', 'rgba(0,0,0,0.55)');
+        shadow.setAttribute('stroke-width', '5');
+        svg.appendChild(shadow);
+
+        // Hilo rojo trenzado
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#dc2626');
+        line.setAttribute('stroke-width', '4.5');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      if (state.view === 'BOARD') drawYarnLines();
+    });
+
+    // =========================================================
+    // 7. MAPA INTERACTIVO DE PUERTO VIEJO
+    // =========================================================
+    const mapLocations = [
+      { id: 'FARO',    name: 'Faro del Norte (Sector A-1)',   x: 95,  y: 55,  desc: 'Fuera de la línea del tranvía y lejos de la Torre del Reloj.' },
+      { id: 'MUELLE',  name: 'Muelle Pesquero (Sector B-1)',  x: 110, y: 175, desc: 'Conectado a la Línea Azul (21:00). Fuera del radio sur.' },
+      { id: 'MANSION', name: 'Mansión del Este (Sector A-4)', x: 470, y: 50,  desc: 'Zona residencial sin acceso a vías de carga.' },
+      { id: 'ESTACION',name: 'Estación Central (Sector B-2)', x: 265, y: 105, desc: 'Cruza la Línea Roja (23:45), pero está en el Sector Norte (fuera del radio de la Torre del Reloj).' },
+      { id: 'KRONOS',  name: 'Almacén Kronos (Sector C-4)',   x: 445, y: 190, desc: 'Ubicado dentro del radio de la Torre del Reloj Sur y conectado directamente a la terminal de la Línea Roja (23:45).' },
+      { id: 'ADUANA',  name: 'Aduana Marítima (Sector C-2)',  x: 245, y: 215, desc: 'Dentro del radio de la Torre del Reloj, pero solo tiene vía de la Línea Azul.' }
+    ];
+
+    function buildCityMap() {
+      const selLoc = mapLocations.find(l => l.id === state.selectedMapBuilding);
+
+      return `
+        <div class="scene-canvas-box" style="background:#e7d8c1;">
+          <svg viewBox="0 0 600 260" width="100%" style="display:block;">
+            <!-- Fondo de mapa antiguo y río -->
+            <rect width="600" height="260" fill="#dfd0b8"/>
+            <path d="M0,140 Q180,120 320,165 T600,140 L600,260 L0,260 Z" fill="#93c5fd" opacity="0.45"/>
+
+            <!-- Cuadrícula cartográfica -->
+            <line x1="200" y1="0" x2="200" y2="260" stroke="#a8a29e" stroke-dasharray="4,4"/>
+            <line x1="400" y1="0" x2="400" y2="260" stroke="#a8a29e" stroke-dasharray="4,4"/>
+            <line x1="0" y1="130" x2="600" y2="130" stroke="#a8a29e" stroke-dasharray="4,4"/>
+
+            ${state.role === 'P1' ? `
+              <!-- Capa exclusiva en el mapa de P1: Vías de Tranvía -->
+              <path d="M95,55 L265,105 L445,190" fill="none" stroke="#dc2626" stroke-width="4" stroke-dasharray="8,4"/>
+              <text x="275" y="92" fill="#991b1b" font-size="11" font-weight="bold">LÍNEA ROJA (23:45)</text>
+              <path d="M110,175 L245,215 L470,50" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="6,4"/>
+              <text x="115" y="162" fill="#1d4ed8" font-size="11" font-weight="bold">LÍNEA AZUL (21:00)</text>
+            ` : `
+              <!-- Capa exclusiva en el mapa de P2: Radio de la Torre del Reloj Sur -->
+              <circle cx="355" cy="200" r="135" fill="rgba(220, 38, 38, 0.12)" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4"/>
+              <circle cx="355" cy="200" r="6" fill="#7f1d1d"/>
+              <text x="295" y="248" fill="#7f1d1d" font-size="11" font-weight="bold">📡 TORRE DEL RELOJ (SECTOR SUR)</text>
+            `}
+
+            <!-- Nodos de Edificios Interactivos -->
+            ${mapLocations.map(loc => {
+              const isSel = state.selectedMapBuilding === loc.id;
+              return `
+                <g class="map-node" onclick="selectBuilding('${loc.id}')">
+                  <circle cx="${loc.x}" cy="${loc.y}" r="${isSel ? 15 : 11}" fill="${isSel ? '#dc2626' : '#1e293b'}" stroke="#fff" stroke-width="2.5"/>
+                  <text x="${loc.x - 42}" y="${loc.y - 16}" fill="#111" font-size="11" font-weight="bold">${loc.name.split(' (')[0]}</text>
+                </g>
+              `;
+            }).join('')}
+          </svg>
+        </div>
+
+        <div class="clue-drawer">
+          <h3>📍 CENTRAL DE OPERACIONES Y REDADA</h3>
+          <p style="margin-bottom:10px;">
+            <strong>Ubicación seleccionada en el mapa:</strong> 
+            <span style="color:#991b1b; font-weight:bold;">${selLoc ? selLoc.name : '(Toca un punto en el mapa de arriba)'}</span>
+          </p>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px; margin-bottom:12px;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:bold; display:block;">Sospechoso (Según Huella):</label>
+              <select id="selSuspect" class="dial-input" style="width:100%; font-size:0.85rem;">
+                <option value="">-- Seleccionar --</option>
+                <option value="VANE">Victoriano "El Conde" Vane (Espiral)</option>
+                <option value="MOREAU">Madame Moreau (Arco)</option>
+                <option value="KROSS">Capitán Kross (Lazo)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:bold; display:block;">Arma Incautada (Según Plano):</label>
+              <select id="selWeapon" class="dial-input" style="width:100%; font-size:0.85rem;">
+                <option value="">-- Seleccionar --</option>
+                <option value="ESPATULA">Espátula de Bronce</option>
+                <option value="DAGA">Daga Ceremonial de Doble Filo</option>
+                <option value="CUERDA">Cuerda de Barco</option>
+              </select>
+            </div>
+          </div>
+          <button class="action-btn" style="width:100%;" onclick="executeRaid()">🚨 ORDENAR REDADA POLICIAL EN ESTA UBICACIÓN</button>
+        </div>
+      `;
+    }
+
+    function selectBuilding(id) {
+      playSfx('pin');
+      state.selectedMapBuilding = id;
+      render();
+    }
+
+    function executeRaid() {
+      const susp = document.getElementById('selSuspect').value;
+      const weap = document.getElementById('selWeapon').value;
+
+      if (!state.selectedMapBuilding) {
+        playSfx('error');
+        alert('Primero selecciona un edificio en el mapa interactivo.');
+        return;
+      }
+
+      if (state.selectedMapBuilding === 'KRONOS' && susp === 'VANE' && weap === 'DAGA') {
+        playSfx('unlock');
+        state.caseWon = true;
+        render();
+      } else {
+        playSfx('error');
+        alert('Redada fallida: la ubicación del mapa, el sospechoso o el arma no coinciden con las pruebas recolectadas.');
+      }
+    }
+
+    // Iniciar
+    render();
+  </script>
+</body>
+</html>
