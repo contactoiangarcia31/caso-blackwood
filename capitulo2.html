@@ -395,3 +395,948 @@
     }
     .heat-3 {
       background: radial-gradient(circle, #a3e635 5%, #059669 55%, #0f172a 95%);
+    }
+    .heat-4 {
+      background: radial-gradient(circle, #38bdf8 5%, #1d4ed8 50%, #0f172a 95%);
+    }
+
+    @keyframes heatPulse {
+      0% { filter: brightness(0.95); }
+      100% { filter: brightness(1.2); }
+    }
+
+    /* 5. Panel de Cables Animados (P1 Fase 3) */
+    .wires-box {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 14px 0;
+    }
+
+    .wire-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0b111d;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      cursor: pointer;
+      transition: transform 0.12s, border-color 0.12s;
+    }
+
+    .wire-row:hover {
+      border-color: var(--amber);
+    }
+
+    .wire-cable {
+      flex: 1;
+      height: 14px;
+      border-radius: 7px;
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .wire-cable.cut {
+      opacity: 0.25;
+      background: #334155 !important;
+    }
+
+    .wire-cable.cut::after {
+      content: "✂ CORTADO";
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.7rem;
+      font-family: monospace;
+      color: var(--crimson);
+      background: #070b12;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--crimson);
+    }
+
+    .feedback-banner {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      min-height: 22px;
+      text-align: center;
+    }
+
+    .feedback-banner.err { color: var(--crimson); }
+    .feedback-banner.ok { color: var(--emerald); }
+
+    .hint-drawer {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 240, 255, 0.07);
+      border: 1px dashed rgba(0, 240, 255, 0.35);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #a5f3fc;
+      display: none;
+    }
+
+    .slider-control {
+      width: 100%;
+      accent-color: var(--cyan);
+      margin: 6px 0 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-shell">
+    <header>
+      <div id="roleHeader" class="status-pill">
+        <span class="pulse-dot"></span>
+        <span>CAPÍTULO 2: BÚNKER 09</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span id="timerText" style="font-family:monospace; color:var(--muted); font-size:0.92rem;">00:00</span>
+        <button class="btn-ghost" onclick="resetGame()">Reiniciar</button>
+      </div>
+    </header>
+
+    <div id="appBody" class="content"></div>
+  </div>
+
+  <script>
+    // --- MOTOR DE SONIDO SINTETIZADO ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sfx(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+
+      if (type === 'tap') {
+        osc.frequency.setValueAtTime(600, now);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      } else if (type === 'valve') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(290, now + 0.12);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      } else if (type === 'ok') {
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.09);
+        osc.frequency.setValueAtTime(783.99, now + 0.18);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+        osc.start(now);
+        osc.stop(now + 0.38);
+      } else if (type === 'err') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.setValueAtTime(110, now + 0.12);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+    }
+
+    // --- ESTADO GLOBAL ---
+    let state = {
+      role: null, // 'P1' o 'P2'
+      stage: 0,   // 1, 2, 3, 4 (Victoria)
+      tab: 0,
+      hints: 0,
+      startTime: null,
+      timerId: null,
+      animFrame: null,
+
+      // Sub-estados de puzzles interactivos
+      valves: [0, 0, 0, 0], // ángulos P1 Fase 1 (Meta: [180, 90, 270, 90])
+      selectedSymbolP2: 'OMEGA',
+      laserGrid: Array(16).fill(false), // Meta P2 Fase 1: índices [1, 6, 8, 15] -> A2, B3, C1, D4
+      freqMHz: 96, // Meta P1 Fase 2: 108
+      freqMod: 30, // Meta P1 Fase 2: 75
+      freqWave: 'sine', // Meta P1 Fase 2: 'triangle'
+      selectedSatP2: 0,
+      thermalInputP2: [], // Meta P2 Fase 2: ['SOL', 'RAYO', 'OJO', 'LUNA']
+      cutWiresP1: [], // Meta P1 Fase 3: [2, 5, 0] (Puertos III, VI, I)
+      simSwitchesP2: [false, false, false] // Interruptores simulador P2 Fase 3
+    };
+
+    function startClock() {
+      if (state.timerId) clearInterval(state.timerId);
+      state.startTime = Date.now();
+      state.timerId = setInterval(() => {
+        const s = Math.floor((Date.now() - state.startTime) / 1000);
+        const mm = String(Math.floor(s / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        document.getElementById('timerText').textContent = `${mm}:${ss}`;
+      }, 1000);
+    }
+
+    function resetGame() {
+      sfx('tap');
+      if (state.timerId) clearInterval(state.timerId);
+      if (state.animFrame) cancelAnimationFrame(state.animFrame);
+      state = {
+        role: null, stage: 0, tab: 0, hints: 0, startTime: null, timerId: null, animFrame: null,
+        valves: [0, 0, 0, 0], selectedSymbolP2: 'OMEGA', laserGrid: Array(16).fill(false),
+        freqMHz: 96, freqMod: 30, freqWave: 'sine', selectedSatP2: 0,
+        thermalInputP2: [], cutWiresP1: [], simSwitchesP2: [false, false, false]
+      };
+      document.getElementById('timerText').textContent = '00:00';
+      render();
+    }
+
+    function chooseRole(r) {
+      sfx('ok');
+      state.role = r;
+      state.stage = 1;
+      state.tab = 0;
+      startClock();
+      render();
+    }
+
+    function switchTab(t) {
+      sfx('tap');
+      if (state.animFrame) cancelAnimationFrame(state.animFrame);
+      state.tab = t;
+      render();
+    }
+
+    function toggleHint() {
+      sfx('tap');
+      const h = document.getElementById('hintBox');
+      if (h) {
+        if (h.style.display !== 'block') state.hints++;
+        h.style.display = 'block';
+      }
+    }
+
+    // =====================================================
+    // RENDERIZADO PRINCIPAL
+    // =====================================================
+    function render() {
+      if (state.animFrame) cancelAnimationFrame(state.animFrame);
+      const root = document.getElementById('appBody');
+      const headerPill = document.getElementById('roleHeader');
+
+      if (!state.role) {
+        headerPill.innerHTML = `<span class="pulse-dot"></span><span>CAPÍTULO 2: BÚNKER 09</span>`;
+        root.innerHTML = `
+          <h1>El Búnker del Relojero</h1>
+          <p>Tras el arresto del Dr. Marcus Sterling, una alarma silenciosa activó la secuencia de autodestrucción en su laboratorio subterráneo secreto. Tienen que infiltrarse y desactivar el reactor de neurotoxina usando sus dos pantallas.</p>
+          <div class="interactive-stage" style="border-left: 4px solid var(--cyan);">
+            <h2 style="font-size:1.05rem;">Novedades del Capítulo 2</h2>
+            <p style="margin-bottom:0;">Todos los acertijos ahora son <strong>gráficos e interactivos</strong>: usarán una linterna UV táctil, girarán válvulas hidráulicas, sintonizarán ondas en un osciloscopio en vivo y cortarán cables bajo presión.</p>
+          </div>
+          <div class="role-grid">
+            <button class="role-card" onclick="chooseRole('P1')">
+              <div style="font-size:2rem; margin-bottom:8px;">🔦</div>
+              <strong style="font-size:1.08rem; color:var(--amber);">Jugador 1: Agente de Infiltración</strong>
+              <p style="margin:6px 0 0; font-size:0.84rem;">Usa la linterna UV, gira las válvulas físicas, opera la cámara térmica y corta los cables del reactor.</p>
+            </button>
+            <button class="role-card" onclick="chooseRole('P2')">
+              <div style="font-size:2rem; margin-bottom:8px;">🛰️</div>
+              <strong style="font-size:1.08rem; color:var(--cyan);">Jugador 2: Especialista en Sistemas</strong>
+              <p style="margin:6px 0 0; font-size:0.84rem;">Desactiva la matriz láser, opera el radar satelital, traduce firmas térmicas y simula el circuito de la bomba.</p>
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      headerPill.innerHTML = `<span class="pulse-dot"></span><span>${state.role === 'P1' ? 'AGENTE DE INFILTRACIÓN' : 'ESPECIALISTA EN SISTEMAS'}</span>`;
+
+      if (state.stage === 4) {
+        const finalTime = document.getElementById('timerText').textContent;
+        root.innerHTML = `
+          <div style="text-align:center; padding:18px 0;">
+            <div style="font-size:3.4rem; margin-bottom:8px;">🛡️</div>
+            <h1>¡Reactor Neutralizado a Tiempo!</h1>
+            <p>Cortaron la energía del Búnker 09 antes de que la neurotoxina se liberara y descargaron el servidor maestro del <strong>Sindicato Espectro</strong>.</p>
+            <div class="interactive-stage" style="text-align:left;">
+              <h2>Reporte de Misión Cooperativa</h2>
+              <p style="margin-bottom:4px;">• <strong>Tiempo oficial del equipo:</strong> <span style="color:var(--cyan); font-family:monospace;">${finalTime}</span></p>
+              <p style="margin-bottom:4px;">• <strong>Pistas tácticas usadas:</strong> ${state.hints}</p>
+              <p style="margin-bottom:0;">• <strong>Clasificación:</strong> ${state.hints === 0 ? 'Agentes Élite División Omega' : 'Operativos Especiales'}</p>
+            </div>
+            <button class="btn" onclick="resetGame()">Volver a Jugar / Intercambiar Roles</button>
+          </div>
+        `;
+        return;
+      }
+
+      // Barra de progreso de 3 fases
+      let prog = `<div class="progress-track">`;
+      for (let i = 1; i <= 3; i++) {
+        const cls = i < state.stage ? 'done' : (i === state.stage ? 'active' : '');
+        prog += `<div class="progress-node ${cls}"></div>`;
+      }
+      prog += `</div>`;
+
+      if (state.role === 'P1' && state.stage === 1) renderP1Stage1(root, prog);
+      else if (state.role === 'P2' && state.stage === 1) renderP2Stage1(root, prog);
+      else if (state.role === 'P1' && state.stage === 2) renderP1Stage2(root, prog);
+      else if (state.role === 'P2' && state.stage === 2) renderP2Stage2(root, prog);
+      else if (state.role === 'P1' && state.stage === 3) renderP1Stage3(root, prog);
+      else if (state.role === 'P2' && state.stage === 3) renderP2Stage3(root, prog);
+    }
+
+    // =====================================================
+    // FASE 1 — P1: LINTERNA UV + VÁLVULAS GIRATORIAS
+    // =====================================================
+    function renderP1Stage1(root, prog) {
+      root.innerHTML = `
+        ${prog}
+        <h2>Fase 1: La Esclusa Hidráulica</h2>
+        <p>Usa tu linterna UV para explorar el muro y tus válvulas para abrir la compuerta. También revisa la caja de fusibles para ayudar a tu pareja.</p>
+        <div class="tab-bar">
+          <button class="tab-btn ${state.tab === 0 ? 'active' : ''}" onclick="switchTab(0)">1. Linterna UV y Válvulas</button>
+          <button class="tab-btn ${state.tab === 1 ? 'active' : ''}" onclick="switchTab(1)">2. Caja de Fusibles (Pista)</button>
+        </div>
+        <div id="stageContent"></div>
+      `;
+
+      const box = document.getElementById('stageContent');
+      if (state.tab === 0) {
+        const valveNames = ['Válvula NORTE (Roja)', 'Válvula ESTE (Azul)', 'Válvula SUR (Verde)', 'Válvula OESTE (Amarilla)'];
+        const valveColors = ['#ff2a5f', '#00f0ff', '#10b981', '#f59e0b'];
+
+        let valvesHtml = `<div class="valves-grid">`;
+        for (let i = 0; i < 4; i++) {
+          valvesHtml += `
+            <div class="valve-box">
+              <div style="font-size:0.8rem; font-weight:700; color:${valveColors[i]}">${valveNames[i]}</div>
+              <svg class="valve-wheel" onclick="rotateValve(${i})" style="transform: rotate(${state.valves[i]}deg)" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="${valveColors[i]}" stroke-width="8" />
+                <circle cx="50" cy="50" r="14" fill="${valveColors[i]}" />
+                <line x1="50" y1="8" x2="50" y2="92" stroke="${valveColors[i]}" stroke-width="6" />
+                <line x1="8" y1="50" x2="92" y2="50" stroke="${valveColors[i]}" stroke-width="6" />
+                <!-- Indicador triangular de dirección -->
+                <polygon points="50,2 43,16 57,16" fill="#ffffff" />
+              </svg>
+              <div style="font-family:monospace; font-size:0.85rem;">Ángulo: <strong>${state.valves[i]}°</strong> (Toca para girar)</div>
+            </div>
+          `;
+        }
+        valvesHtml += `</div>`;
+
+        box.innerHTML = `
+          <div class="interactive-stage">
+            <strong style="color:var(--purple); display:block; margin-bottom:6px;">🔦 Desliza el dedo o el mouse para alumbrar con Luz UV:</strong>
+            <div class="uv-wall" id="uvWall">
+              <div class="uv-grid-lines"></div>
+              <div class="uv-hidden-layer" id="uvBeam"></div>
+              <div class="uv-secret-item" data-x="50" data-y="18" style="left:42%; top:12%;">NORTE<br><span style="font-size:1.5rem;">Ω (Omega)</span></div>
+              <div class="uv-secret-item" data-x="82" data-y="50" style="left:74%; top:42%;">ESTE<br><span style="font-size:1.5rem;">Δ (Delta)</span></div>
+              <div class="uv-secret-item" data-x="50" data-y="82" style="left:42%; top:74%;">SUR<br><span style="font-size:1.5rem;">Ψ (Psi)</span></div>
+              <div class="uv-secret-item" data-x="18" data-y="50" style="left:10%; top:42%;">OESTE<br><span style="font-size:1.5rem;">Σ (Sigma)</span></div>
+            </div>
+            <p style="font-size:0.82rem; margin-top:8px; margin-bottom:0;">Dile a tu pareja qué símbolo griego brilla en cada punto cardinal para que te diga a cuántos grados girar cada válvula:</p>
+            ${valvesHtml}
+            <button class="btn" style="width:100%;" onclick="verifyP1Stage1()">Despresurizar Esclusa</button>
+            <div id="fbMsg" class="feedback-banner"></div>
+            <button class="btn-ghost" style="margin-top:8px;" onclick="toggleHint()">¿Atorados? Ver pista</button>
+            <div id="hintBox" class="hint-drawer">Alumbra las 4 orillas del cuadro negro (arriba, derecha, abajo, izquierda). Dile a tu pareja: Norte=Omega, Este=Delta, Sur=Psi, Oeste=Sigma. Ella verá los grados en su Calibrador.</div>
+          </div>
+        `;
+        initUVLight();
+      } else {
+        box.innerHTML = `
+          <div class="interactive-stage">
+            <h3 style="color:var(--amber); margin-bottom:8px;">⚡ Diagrama de Fusibles Activos</h3>
+            <p>Tu pareja tiene una Matriz Láser de 4x4 (Filas A, B, C, D y Columnas 1, 2, 3, 4). Dile que <strong>solo debe encender los 4 nodos</strong> donde el fusible aquí abajo brilla en verde:</p>
+            <svg viewBox="0 0 320 200" style="width:100%; max-width:360px; display:block; margin:10px auto; background:#090d16; border-radius:8px; border:1px solid #1e293b;">
+              <text x="20" y="35" fill="#8496b0" font-family="monospace" font-size="13">FILA A -> Columna 2 [ACTIVO]</text>
+              <circle cx="280" cy="30" r="9" fill="#10b981"><animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite"/></circle>
+
+              <text x="20" y="80" fill="#8496b0" font-family="monospace" font-size="13">FILA B -> Columna 3 [ACTIVO]</text>
+              <circle cx="280" cy="75" r="9" fill="#10b981"><animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/></circle>
+
+              <text x="20" y="125" fill="#8496b0" font-family="monospace" font-size="13">FILA C -> Columna 1 [ACTIVO]</text>
+              <circle cx="280" cy="120" r="9" fill="#10b981"><animate attributeName="opacity" values="1;0.3;1" dur="0.9s" repeatCount="indefinite"/></circle>
+
+              <text x="20" y="170" fill="#8496b0" font-family="monospace" font-size="13">FILA D -> Columna 4 [ACTIVO]</text>
+              <circle cx="280" cy="165" r="9" fill="#10b981"><animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite"/></circle>
+            </svg>
+          </div>
+        `;
+      }
+    }
+
+    function initUVLight() {
+      const wall = document.getElementById('uvWall');
+      const beam = document.getElementById('uvBeam');
+      if (!wall || !beam) return;
+      const items = wall.querySelectorAll('.uv-secret-item');
+
+      function moveLight(clientX, clientY) {
+        const rect = wall.getBoundingClientRect();
+        const xPct = ((clientX - rect.left) / rect.width) * 100;
+        const yPct = ((clientY - rect.top) / rect.height) * 100;
+        beam.style.setProperty('--x', `${xPct}%`);
+        beam.style.setProperty('--y', `${yPct}%`);
+
+        items.forEach(el => {
+          const ix = parseFloat(el.dataset.x);
+          const iy = parseFloat(el.dataset.y);
+          const dist = Math.hypot(xPct - ix, yPct - iy);
+          el.style.opacity = dist < 24 ? '1' : '0.04';
+        });
+      }
+
+      wall.addEventListener('mousemove', e => moveLight(e.clientX, e.clientY));
+      wall.addEventListener('touchmove', e => {
+        e.preventDefault();
+        moveLight(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+    }
+
+    function rotateValve(idx) {
+      sfx('valve');
+      state.valves[idx] = (state.valves[idx] + 90) % 360;
+      render();
+    }
+
+    function verifyP1Stage1() {
+      // NORTE=Omega(180), ESTE=Delta(90), SUR=Psi(270), OESTE=Sigma(90)
+      const target = [180, 90, 270, 90];
+      const fb = document.getElementById('fbMsg');
+      if (state.valves.every((v, i) => v === target[i])) {
+        sfx('ok');
+        fb.className = 'feedback-banner ok';
+        fb.textContent = '¡Presión estabilizada! Compuerta abierta...';
+        setTimeout(() => { state.stage = 2; state.tab = 0; render(); }, 900);
+      } else {
+        sfx('err');
+        fb.className = 'feedback-banner err';
+        fb.textContent = 'Ángulos incorrectos. Verifica cada símbolo UV con tu pareja.';
+      }
+    }
+
+    // =====================================================
+    // FASE 1 — P2: CALIBRADOR DE SÍMBOLOS + MATRIZ LÁSER
+    // =====================================================
+    function renderP2Stage1(root, prog) {
+      root.innerHTML = `
+        ${prog}
+        <h2>Fase 1: Cortafuegos y Calibrador</h2>
+        <p>Ayuda a tu pareja a calibrar las válvulas según los símbolos que vea con su luz UV, y desactiva tu Matriz de Nodos Láser.</p>
+        <div class="tab-bar">
+          <button class="tab-btn ${state.tab === 0 ? 'active' : ''}" onclick="switchTab(0)">1. Matriz Láser 4x4</button>
+          <button class="tab-btn ${state.tab === 1 ? 'active' : ''}" onclick="switchTab(1)">2. Traductor de Símbolos UV</button>
+        </div>
+        <div id="stageContent"></div>
+      `;
+
+      const box = document.getElementById('stageContent');
+      if (state.tab === 0) {
+        const rows = ['A', 'B', 'C', 'D'];
+        let gridHtml = `<div class="laser-grid">`;
+        for (let i = 0; i < 16; i++) {
+          const r = rows[Math.floor(i / 4)];
+          const c = (i % 4) + 1;
+          const active = state.laserGrid[i] ? 'active' : '';
+          gridHtml += `<button class="laser-node ${active}" onclick="toggleLaserNode(${i})">${r}${c}</button>`;
+        }
+        gridHtml += `</div>`;
+
+        box.innerHTML = `
+          <div class="interactive-stage">
+            <strong style="color:var(--crimson);">🔴 Cortafuegos Láser:</strong>
+            <p style="margin-top:4px;">Pregúntale al Agente de Infiltración cuáles son los 4 fusibles activos en su caja eléctrica y enciende únicamente esos 4 nodos:</p>
+            ${gridHtml}
+            <button class="btn" style="width:100%;" onclick="verifyP2Stage1()">Desactivar Cortafuegos Láser</button>
+            <div id="fbMsg" class="feedback-banner"></div>
+            <button class="btn-ghost" style="margin-top:8px;" onclick="toggleHint()">¿Atorados? Ver pista</button>
+            <div id="hintBox" class="hint-drawer">Tu pareja debe entrar a su pestaña "2. Caja de Fusibles" y dictarte las 4 coordenadas verdes (A2, B3, C1 y D4).</div>
+          </div>
+        `;
+      } else {
+        const symData = {
+          'OMEGA': { glyph: 'Ω (Omega)', angle: '180°', note: 'Media vuelta hacia abajo' },
+          'DELTA': { glyph: 'Δ (Delta)', angle: '90°', note: 'Cuarto de vuelta a la derecha' },
+          'PSI':   { glyph: 'Ψ (Psi)',   angle: '270°', note: 'Tres cuartos de vuelta (izquierda)' },
+          'SIGMA': { glyph: 'Σ (Sigma)', angle: '90°', note: 'Cuarto de vuelta a la derecha' },
+          'THETA': { glyph: 'Θ (Theta)', angle: '0°', note: 'Posición inicial superior' }
+        };
+        const cur = symData[state.selectedSymbolP2];
+
+        box.innerHTML = `
+          <div class="interactive-stage" style="text-align:center;">
+            <h3 style="color:var(--cyan); margin-bottom:8px;">Toca el símbolo que te dicte tu pareja:</h3>
+            <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:16px;">
+              ${Object.keys(symData).map(k => `
+                <button class="tab-btn ${state.selectedSymbolP2 === k ? 'active' : ''}" style="min-width:90px; flex:0;" onclick="selectSymP2('${k}')">${symData[k].glyph}</button>
+              `).join('')}
+            </div>
+            <div style="background:#0d1524; border:1px solid var(--border); border-radius:10px; padding:16px;">
+              <div style="font-size:0.85rem; color:var(--muted);">ÁNGULO REQUERIDO EN LA VÁLVULA:</div>
+              <div style="font-size:2.4rem; font-weight:800; color:var(--amber); font-family:monospace; margin:6px 0;">${cur.angle}</div>
+              <div style="font-size:0.85rem; color:var(--text);">${cur.note}</div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function toggleLaserNode(i) {
+      sfx('tap');
+      state.laserGrid[i] = !state.laserGrid[i];
+      render();
+    }
+
+    function selectSymP2(k) {
+      sfx('tap');
+      state.selectedSymbolP2 = k;
+      render();
+    }
+
+    function verifyP2Stage1() {
+      // Índices de A2 (1), B3 (6), C1 (8), D4 (15)
+      const targetIdx = [1, 6, 8, 15];
+      const ok = state.laserGrid.every((val, idx) => targetIdx.includes(idx) ? val === true : val === false);
+      const fb = document.getElementById('fbMsg');
+      if (ok) {
+        sfx('ok');
+        fb.className = 'feedback-banner ok';
+        fb.textContent = '¡Matriz láser desbloqueada! Pasando a Fase 2...';
+        setTimeout(() => { state.stage = 2; state.tab = 0; render(); }, 900);
+      } else {
+        sfx('err');
+        fb.className = 'feedback-banner err';
+        fb.textContent = 'Secuencia de nodos incorrecta. Verifica las 4 coordenadas con tu pareja.';
+      }
+    }
+
+    // =====================================================
+    // FASE 2 — P1: OSCILOSCOPIO EN VIVO + CÁMARA TÉRMICA
+    // =====================================================
+    function renderP1Stage2(root, prog) {
+      root.innerHTML = `
+        ${prog}
+        <h2>Fase 2: Osciloscopio y Firma Térmica</h2>
+        <p>Sintoniza la onda de interferencia para abrir la puerta blindada y observa el teclado con tu cámara térmica para guiar a tu pareja.</p>
+        <div class="tab-bar">
+          <button class="tab-btn ${state.tab === 0 ? 'active' : ''}" onclick="switchTab(0)">1. Osciloscopio en Vivo</button>
+          <button class="tab-btn ${state.tab === 1 ? 'active' : ''}" onclick="switchTab(1)">2. Cámara Térmica (Pista)</button>
+        </div>
+        <div id="stageContent"></div>
+      `;
+
+      const box = document.getElementById('stageContent');
+      if (state.tab === 0) {
+        box.innerHTML = `
+          <div class="interactive-stage">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:0.85rem; color:var(--cyan);">📡 Receptor del Búnker: <strong>BALIZA ESMERALDA (SAT-02)</strong></span>
+            </div>
+            <canvas id="scopeCanvas" width="600" height="170" style="width:100%; height:150px; background:#040811; border:1px solid #1e293b; border-radius:8px; margin-bottom:12px;"></canvas>
+            
+            <label style="font-size:0.85rem; display:block;">1. Tipo de Onda: <strong style="color:var(--amber);">${state.freqWave.toUpperCase()}</strong></label>
+            <div style="display:flex; gap:8px; margin:6px 0 12px;">
+              <button class="tab-btn ${state.freqWave === 'sine' ? 'active' : ''}" onclick="setWaveType('sine')">Senoidal</button>
+              <button class="tab-btn ${state.freqWave === 'square' ? 'active' : ''}" onclick="setWaveType('square')">Cuadrada</button>
+              <button class="tab-btn ${state.freqWave === 'triangle' ? 'active' : ''}" onclick="setWaveType('triangle')">Triangular</button>
+            </div>
+
+            <label style="font-size:0.85rem;">2. Frecuencia: <strong id="mhzVal" style="color:var(--cyan); font-family:monospace;">${state.freqMHz} MHz</strong></label>
+            <input type="range" min="88" max="120" step="2" value="${state.freqMHz}" class="slider-control" oninput="updateScopeParams(this.value, null)" />
+
+            <label style="font-size:0.85rem;">3. Modulación: <strong id="modVal" style="color:var(--cyan); font-family:monospace;">${state.freqMod}%</strong></label>
+            <input type="range" min="15" max="90" step="5" value="${state.freqMod}" class="slider-control" oninput="updateScopeParams(null, this.value)" />
+
+            <button class="btn" style="width:100%; margin-top:6px;" onclick="verifyP1Stage2()">Sincronizar Frecuencia</button>
+            <div id="fbMsg" class="feedback-banner"></div>
+            <button class="btn-ghost" style="margin-top:8px;" onclick="toggleHint()">¿Atorados? Ver pista</button>
+            <div id="hintBox" class="hint-drawer">Pídele a tu pareja que toque el satélite "SAT-02 (Esmeralda)" en su radar y te dicte qué Tipo de Onda, MHz y % de Modulación necesitas.</div>
+          </div>
+        `;
+        startOscilloscope();
+      } else {
+        box.innerHTML = `
+          <div class="interactive-stage">
+            <h3 style="color:var(--amber); margin-bottom:6px;">🌡️ Visor Infrarrojo: Calor Residual</h3>
+            <p>El Dr. Sterling acaba de presionar 4 botones en este panel. Dile a tu pareja el orden desde el <strong>MÁS CALIENTE (Blanco/Rojo)</strong> hasta el <strong>MÁS FRÍO (Azul)</strong>:</p>
+            <div class="thermal-pad">
+              <div class="thermal-key">☄️</div>
+              <div class="thermal-key heat-1">☀️<span style="font-size:0.65rem; font-family:monospace;">42.8°C</span></div>
+              <div class="thermal-key">⚓</div>
+              <div class="thermal-key heat-3">👁️<span style="font-size:0.65rem; font-family:monospace;">34.1°C</span></div>
+              <div class="thermal-key">⚙️</div>
+              <div class="thermal-key heat-4">🌙<span style="font-size:0.65rem; font-family:monospace;">29.5°C</span></div>
+              <div class="thermal-key heat-2">⚡<span style="font-size:0.65rem; font-family:monospace;">38.4°C</span></div>
+              <div class="thermal-key">🧬</div>
+              <div class="thermal-key">⏳</div>
+            </div>
+            <p style="font-size:0.8rem; text-align:center; margin-bottom:0;">Escala térmica: 1° Blanco/Rojo (42.8°C) → 2° Naranja (38.4°C) → 3° Verde (34.1°C) → 4° Azul (29.5°C)</p>
+          </div>
+        `;
+      }
+    }
+
+    function setWaveType(w) {
+      sfx('tap');
+      state.freqWave = w;
+      render();
+    }
+
+    function updateScopeParams(mhz, mod) {
+      if (mhz !== null) {
+        state.freqMHz = parseInt(mhz, 10);
+        document.getElementById('mhzVal').textContent = `${state.freqMHz} MHz`;
+      }
+      if (mod !== null) {
+        state.freqMod = parseInt(mod, 10);
+        document.getElementById('modVal').textContent = `${state.freqMod}%`;
+      }
+    }
+
+    function startOscilloscope() {
+      const canvas = document.getElementById('scopeCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let phase = 0;
+
+      function drawWave(yFunc, color, lineWidth, dashed) {
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.setLineDash(dashed ? [6, 6] : []);
+        for (let x = 0; x < canvas.width; x++) {
+          const y = yFunc(x);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      function waveMath(type, x, freq, amp, ph) {
+        const t = (x * freq * 0.0008) + ph;
+        if (type === 'sine') return Math.sin(t) * amp;
+        if (type === 'square') return (Math.sin(t) >= 0 ? 1 : -1) * amp;
+        if (type === 'triangle') return (2 / Math.PI) * Math.asin(Math.sin(t)) * amp;
+        return 0;
+      }
+
+      function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const midY = canvas.height / 2;
+
+        // Onda objetivo guía (tenue al fondo: Triangular, 108 MHz, 75%)
+        drawWave(x => midY + waveMath('triangle', x, 108, 75 * 0.7, phase), 'rgba(16, 185, 129, 0.35)', 2, true);
+
+        // Onda en vivo del jugador
+        const match = (state.freqWave === 'triangle' && state.freqMHz === 108 && state.freqMod === 75);
+        const userColor = match ? '#10b981' : '#00f0ff';
+        drawWave(x => midY + waveMath(state.freqWave, x, state.freqMHz, state.freqMod * 0.7, phase), userColor, 3, false);
+
+        phase += 0.07;
+        state.animFrame = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function verifyP1Stage2() {
+      const fb = document.getElementById('fbMsg');
+      if (state.freqWave === 'triangle' && state.freqMHz === 108 && state.freqMod === 75) {
+        sfx('ok');
+        fb.className = 'feedback-banner ok';
+        fb.textContent = '¡Señal en fase! Compuerta del reactor desbloqueada...';
+        setTimeout(() => { state.stage = 3; state.tab = 0; render(); }, 900);
+      } else {
+        sfx('err');
+        fb.className = 'feedback-banner err';
+        fb.textContent = 'La onda aún no coincide con los parámetros de SAT-02.';
+      }
+    }
+
+    // =====================================================
+    // FASE 2 — P2: RADAR SATELITAL + SECUENCIA TÉRMICA
+    // =====================================================
+    function renderP2Stage2(root, prog) {
+      root.innerHTML = `
+        ${prog}
+        <h2>Fase 2: Radar Satelital y Secuencia Térmica</h2>
+        <p>Ingresa los 4 símbolos en orden de temperatura según la cámara térmica de tu pareja y consulta el radar para darle sus parámetros de onda.</p>
+        <div class="tab-bar">
+          <button class="tab-btn ${state.tab === 0 ? 'active' : ''}" onclick="switchTab(0)">1. Consola Térmica</button>
+          <button class="tab-btn ${state.tab === 1 ? 'active' : ''}" onclick="switchTab(1)">2. Radar Satelital (Pista)</button>
+        </div>
+        <div id="stageContent"></div>
+      `;
+
+      const box = document.getElementById('stageContent');
+      if (state.tab === 0) {
+        const symbols = [
+          { id: 'COMETA', icon: '☄️', label: 'Cometa' },
+          { id: 'SOL',    icon: '☀️', label: 'Sol' },
+          { id: 'ANCLA',  icon: '⚓', label: 'Ancla' },
+          { id: 'OJO',    icon: '👁️', label: 'Ojo' },
+          { id: 'ENGRANE',icon: '⚙️', label: 'Engrane' },
+          { id: 'LUNA',   icon: '🌙', label: 'Luna' },
+          { id: 'RAYO',   icon: '⚡', label: 'Rayo' },
+          { id: 'ADN',    icon: '🧬', label: 'ADN' }
+        ];
+
+        box.innerHTML = `
+          <div class="interactive-stage">
+            <strong style="color:var(--cyan);">🔥 Secuencia de Calor Residual (4 símbolos):</strong>
+            <p style="margin-top:4px;">Toca los 4 símbolos en orden desde el <strong>MÁS CALIENTE (1°)</strong> hasta el <strong>MÁS FRÍO (4°)</strong> según lo que ve tu pareja:</p>
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:12px 0;">
+              ${symbols.map(s => `
+                <button class="tab-btn" style="min-width:0; padding:12px 6px;" onclick="pushThermalSym('${s.id}')">
+                  <div style="font-size:1.5rem;">${s.icon}</div>
+                  <div style="font-size:0.75rem; margin-top:4px;">${s.label}</div>
+                </button>
+              `).join('')}
+            </div>
+            <div style="background:#0d1524; padding:12px; border-radius:8px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <span style="font-family:monospace; font-size:0.9rem;">Secuencia: <strong style="color:var(--amber);">${state.thermalInputP2.join(' → ') || '(Vacía)'}</strong></span>
+              <button class="btn-ghost" onclick="clearThermalSym()">Borrar</button>
+            </div>
+            <button class="btn" style="width:100%;" onclick="verifyP2Stage2()">Validar Secuencia Térmica</button>
+            <div id="fbMsg" class="feedback-banner"></div>
+            <button class="btn-ghost" style="margin-top:8px;" onclick="toggleHint()">¿Atorados? Ver pista</button>
+            <div id="hintBox" class="hint-drawer">Tu pareja debe mirar su pestaña "2. Cámara Térmica" y dictarte los 4 símbolos con temperatura de mayor a menor: Sol (42.8°C) → Rayo (38.4°C) → Ojo (34.1°C) → Luna (29.5°C).</div>
+          </div>
+        `;
+      } else {
+        const sats = [
+          { name: 'SAT-01 (Rubí)', wave: 'CUADRADA', mhz: '94 MHz', mod: '45%' },
+          { name: 'SAT-02 (Esmeralda)', wave: 'TRIANGULAR', mhz: '108 MHz', mod: '75%' },
+          { name: 'SAT-03 (Zafiro)', wave: 'SENOIDAL', mhz: '116 MHz', mod: '60%' }
+        ];
+        const cur = sats[state.selectedSatP2];
+
+        box.innerHTML = `
+          <div class="interactive-stage" style="text-align:center;">
+            <svg viewBox="0 0 200 200" style="width:160px; height:160px; margin:0 auto 12px; display:block;">
+              <circle cx="100" cy="100" r="90" fill="#04120e" stroke="#10b981" stroke-width="2" />
+              <circle cx="100" cy="100" r="60" fill="none" stroke="rgba(16,185,129,0.3)" stroke-width="1" />
+              <circle cx="100" cy="100" r="30" fill="none" stroke="rgba(16,185,129,0.3)" stroke-width="1" />
+              <line x1="100" y1="10" x2="100" y2="190" stroke="rgba(16,185,129,0.25)" />
+              <line x1="10" y1="100" x2="190" y2="100" stroke="rgba(16,185,129,0.25)" />
+              <!-- Barrido animado -->
+              <line x1="100" y1="100" x2="100" y2="12" stroke="#10b981" stroke-width="3">
+                <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="3s" repeatCount="indefinite" />
+              </line>
+              <circle cx="65" cy="55" r="5" fill="#ff2a5f" />
+              <circle cx="145" cy="75" r="6" fill="#10b981" />
+              <circle cx="80" cy="145" r="5" fill="#00f0ff" />
+            </svg>
+            <div style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+              ${sats.map((s, i) => `
+                <button class="tab-btn ${state.selectedSatP2 === i ? 'active' : ''}" onclick="selectSat(${i})">${s.name}</button>
+              `).join('')}
+            </div>
+            <div style="background:#0d1524; border:1px solid var(--border); border-radius:8px; padding:12px;">
+              <div>Onda: <strong style="color:var(--amber);">${cur.wave}</strong> | Frecuencia: <strong style="color:var(--cyan);">${cur.mhz}</strong> | Modulación: <strong style="color:var(--emerald);">${cur.mod}</strong></div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function pushThermalSym(id) {
+      sfx('tap');
+      if (state.thermalInputP2.length < 4 && !state.thermalInputP2.includes(id)) {
+        state.thermalInputP2.push(id);
+        render();
+      }
+    }
+
+    function clearThermalSym() {
+      sfx('tap');
+      state.thermalInputP2 = [];
+      render();
+    }
+
+    function selectSat(i) {
+      sfx('tap');
+      state.selectedSatP2 = i;
+      render();
+    }
+
+    function verifyP2Stage2() {
+      const target = ['SOL', 'RAYO', 'OJO', 'LUNA'];
+      const fb = document.getElementById('fbMsg');
+      if (state.thermalInputP2.length === 4 && state.thermalInputP2.every((v, i) => v === target[i])) {
+        sfx('ok');
+        fb.className = 'feedback-banner ok';
+        fb.textContent = '¡Acceso biométrico concedido! Avanzando al Reactor...';
+        setTimeout(() => { state.stage = 3; state.tab = 0; render(); }, 900);
+      } else {
+        sfx('err');
+        fb.className = 'feedback-banner err';
+        fb.textContent = 'Orden térmico incorrecto. Se ha reiniciado la secuencia.';
+        state.thermalInputP2 = [];
+        setTimeout(render, 700);
+      }
+    }
+
+    // =====================================================
+    // FASE 3 — P1: CORTE DE CABLES DEL REACTOR
+    // =====================================================
+    function renderP1Stage3(root, prog) {
+      const wires = [
+        { port: 'Puerto I',   name: 'Cable Rojo con Rayas Blancas', style: 'repeating-linear-gradient(45deg, #ff2a5f, #ff2a5f 10px, #ffffff 10px, #ffffff 20px)' },
+        { port: 'Puerto II',  name: 'Cable Azul Sólido',            style: '#00f0ff' },
+        { port: 'Puerto III', name: 'Cable Amarillo Industrial',    style: 'repeating-linear-gradient(90deg, #f59e0b, #f59e0b 12px, #1e293b 12px, #1e293b 18px)' },
+        { port: 'Puerto IV',  name: 'Cable Verde Esmeralda',        style: '#10b981' },
+        { port: 'Puerto V',   name: 'Cable Morado Neón',            style: '#a855f7' },
+        { port: 'Puerto VI',  name: 'Cable Blanco Espiral',         style: 'repeating-linear-gradient(-45deg, #e2e8f0, #e2e8f0 8px, #64748b 8px, #64748b 16px)' }
+      ];
+
+      root.innerHTML = `
+        ${prog}
+        <h2>Fase 3: El Núcleo de Neurotoxina</h2>
+        <p>¡Última etapa! Dile a tu pareja los datos del marcador del reactor que aparecen aquí abajo para que su simulador calcule <strong>cuáles 3 cables debes cortar y en qué orden exacto</strong>.</p>
+        
+        <div class="interactive-stage">
+          <div style="background:#140c1c; border:1px solid var(--purple); border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-family:monospace; font-size:0.86rem;">
+            <span>⚡ VOLTAJE DEL NÚCLEO: <strong style="color:var(--amber);">480V</strong></span>
+            <span>🔄 POLARIDAD: <strong style="color:var(--cyan);">INVERSA</strong></span>
+            <span>🔑 PIN DE EMERGENCIA P2: <strong style="color:var(--emerald);">7390</strong></span>
+          </div>
+
+          <div class="wires-box">
+            ${wires.map((w, idx) => {
+              const isCut = state.cutWiresP1.includes(idx);
+              return `
+                <div class="wire-row" onclick="cutWireP1(${idx})">
+                  <strong style="font-family:monospace; width:82px; font-size:0.85rem; color:var(--amber);">${w.port}</strong>
+                  <div class="wire-cable ${isCut ? 'cut' : ''}" style="background:${w.style};"></div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+            <span style="font-family:monospace; font-size:0.85rem;">Orden cortado: <strong>${state.cutWiresP1.map(i => wires[i].port).join(' → ') || 'Ninguno'}</strong></span>
+            <button class="btn-ghost" onclick="resetWiresP1()">Reconectar Cables</button>
+          </div>
+          <div id="fbMsg" class="feedback-banner"></div>
+          <button class="btn-ghost" style="margin-top:8px;" onclick="toggleHint()">¿Atorados? Ver pista</button>
+          <div id="hintBox" class="hint-drawer">Dile a tu pareja que active en su Simulador: "Voltaje 480V" y "Polaridad Inversa". Eso le revelará que debes cortar en este orden exacto: 1° Puerto III (Amarillo), 2° Puerto VI (Blanco), 3° Puerto I (Rojo con rayas).</div>
+        </div>
+      `;
+    }
+
+    function cutWireP1(idx) {
+      if (state.cutWiresP1.includes(idx)) return;
+      state.cutWiresP1.push(idx);
+
+      // Meta exacta: [2, 5, 0] -> Puerto III, luego Puerto VI, luego Puerto I
+      const target = [2, 5, 0];
+      const currentStep = state.cutWiresP1.length - 1;
+
+      if (state.cutWiresP1[currentStep] !== target[currentStep]) {
+        sfx('err');
+        render();
+        const fb = document.getElementById('fbMsg');
+        fb.className = 'feedback-banner err';
+        fb.textContent = '💥 ¡Chispazo de seguridad! Orden o cable incorrecto. Reiniciando panel...';
+        setTimeout(() => {
+          state.cutWiresP1 = [];
+          render();
+        }, 1100);
+        return;
+      }
+
+      sfx('valve');
+      render();
+
+      if (state.cutWiresP1.length === 3) {
+        sfx('ok');
+        const fb = document.getElementById('fbMsg');
+        fb.className = 'feedback-banner ok';
+        fb.textContent = '¡Cables neutralizados con éxito!';
+        setTimeout(() => { state.stage = 4; render(); }, 900);
+      }
+    }
+
+    function resetWiresP1() {
+      sfx('tap');
+      state.cutWiresP1 = [];
+      render();
+    }
+
+    // =====================================================
+    // FASE 3 — P2: SIMULADOR DE CIRCUITO DE LA BOMBA
+    // =====================================================
+    function renderP2Stage3(root, prog) {
+      const s0 = state.simSwitchesP2[0]; // true = 480V
+      const s1 = state.simSwitchesP2[1]; // true = Polaridad Inversa
+
+      let instructionText = 'Ajusta los 2 interruptores de arriba según lo que vea tu pareja en el núcleo...';
+      if (!s0 && !s1) instructionText = 'Configuración [240V / Directa]: Cortar II → IV → V';
+      if (s0 && !s1)  instructionText = 'Configuración [480V / Directa]: Cortar V → II → III';
+      if (!s0 && s1)  instructionText = 'Configuración [240V / Inversa]: Cortar IV → I → II';
+      if (s0 && s1)   instructionText = '✅ Configuración [480V / Inversa]: Cortar en orden: 1° Puerto III (Amarillo) → 2° Puerto VI (Blanco) → 3° Puerto I (Rojo)';
+
+      root.innerHTML = `
+        ${prog}
+        <h2>Fase 3: Simulador Lógico del Reactor</h2>
+        <p>Configura el simulador con el Voltaje y la Polaridad que lee tu pareja en el reactor para decirle qué cables cortar, e ingresa el PIN de emergencia que aparece en su pantalla.</p>
+
+        <div class="interactive-stage">
+          <h3 style="color:var(--cyan); margin-bottom:10px;">1. Interruptores del Simulador de Corte:</h3>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+            <button class="tab-btn ${s0 ? 'active' : ''}" onclick="toggleSimP2(0)">
+              Voltaje: <strong>${s0 ? '480V (Alto)' : '240V (Estándar)'}</strong>
+            </button>
+            <button class="tab-btn ${s1 ? 'active' : ''}" onclick="toggleSimP2(1)">
+              Polaridad: <strong>${s1 ? 'INVERSA' : 'DIRECTA'}</strong>
+            </button>
+          </div>
+
+          <div style="background:#0d1524; border:1px solid var(--border); border-left:4px solid var(--amber); padding:14px; border-radius:8px; margin-bottom:18px; font-family:monospace; font-size:0.9rem;">
+            ${instructionText}
+          </div>
+
+          <h3 style="color:var(--emerald); margin-bottom:8px;">2. Cierre de Válvula Digital:</h3>
+          <p style="margin-bottom:8px;">Ingresa el <strong>PIN de Emergencia de 4 dígitos</strong> impreso en la placa del reactor de tu pareja:</p>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="finalPinP2" placeholder="PIN DE 4 DÍGITOS..." style="flex:1; background:#040811; border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:8px; font-family:monospace; font-size:1.05rem;" onkeydown="if(event.key==='Enter') verifyP2Stage3()" />
+            <button class="btn" onclick="verifyP2Stage3()">Bloquear</button>
+          </div>
+          <div id="fbMsg" class="feedback-banner"></div>
+        </div>
+      `;
+    }
+
+    function toggleSimP2(idx) {
+      sfx('tap');
+      state.simSwitchesP2[idx] = !state.simSwitchesP2[idx];
+      render();
+    }
+
+    function verifyP2Stage3() {
+      const val = document.getElementById('finalPinP2').value.trim();
+      const fb = document.getElementById('fbMsg');
+      if (val === '7390') {
+        sfx('ok');
+        fb.className = 'feedback-banner ok';
+        fb.textContent = '¡Reactor sellado digitalmente!';
+        setTimeout(() => { state.stage = 4; render(); }, 900);
+      } else {
+        sfx('err');
+        fb.className = 'feedback-banner err';
+        fb.textContent = 'PIN incorrecto. Pídele al Agente de Infiltración el PIN verde de su pantalla.';
+      }
+    }
+
+    // Iniciar app
+    render();
+  </script>
+</body>
+</html>
