@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expediente #8419: El Caso Blackwood</title>
+  <style>
+    :root {
+      --bg-dark: #0d1117;
+      --bg-panel: #161b22;
+      --bg-card: #1f2630;
+      --border: #30363d;
+      --gold: #d29922;
+      --gold-light: #e3b341;
+      --crimson: #f85149;
+      --cyan: #58a6ff;
+      --green: #3fb950;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      background-image: radial-gradient(circle at 50% 0%, #1c2433 0%, #0d1117 70%);
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 680px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    header {
+      background: #090c10;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .badge {
+      font-family: monospace;
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: rgba(210, 153, 34, 0.15);
+      color: var(--gold-light);
+      border: 1px solid rgba(210, 153, 34, 0.4);
+    }
+
+    .role-badge-p1 {
+      background: rgba(248, 81, 73, 0.15);
+      color: #ff7b72;
+      border-color: rgba(248, 81, 73, 0.4);
+    }
+
+    .role-badge-p2 {
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--cyan);
+      border-color: rgba(88, 166, 255, 0.4);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .content {
+      padding: 24px 20px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      color: var(--gold-light);
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 560px) {
+      .role-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .role-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      color: var(--text);
+    }
+
+    .role-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--gold);
+    }
+
+    .role-card.p1:hover {
+      border-color: var(--crimson);
+    }
+
+    .role-card.p2:hover {
+      border-color: var(--cyan);
+    }
+
+    .role-icon {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .role-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .progress-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+
+    .progress-step {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    .progress-step.active {
+      background: var(--gold);
+    }
+
+    .progress-step.done {
+      background: var(--green);
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .evidence-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .evidence-btn:hover, .evidence-btn.selected {
+      border-color: var(--gold-light);
+      background: #262f3d;
+    }
+
+    .evidence-btn strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+      color: var(--gold-light);
+    }
+
+    .evidence-btn span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .inspector-box {
+      background: #0b0e14;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--gold);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 22px;
+      font-size: 0.95rem;
+    }
+
+    .inspector-box h3 {
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .mono-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 0.88rem;
+    }
+
+    .mono-table th, .mono-table td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    .mono-table th {
+      background: #161b22;
+      color: var(--gold-light);
+    }
+
+    .unlock-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 16px;
+    }
+
+    .unlock-panel label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="text"], select {
+      flex: 1;
+      background: #090c10;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 1.05rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    input[type="text"]:focus, select:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    .btn {
+      background: var(--gold);
+      color: #090c10;
+      font-weight: 700;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 500;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+    }
+
+    .btn-secondary:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    .feedback {
+      margin-top: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      min-height: 20px;
+    }
+
+    .feedback.error {
+      color: var(--crimson);
+    }
+
+    .feedback.success {
+      color: var(--green);
+    }
+
+    .hint-box {
+      margin-top: 14px;
+      padding: 12px;
+      background: rgba(88, 166, 255, 0.08);
+      border: 1px dashed rgba(88, 166, 255, 0.4);
+      border-radius: 6px;
+      font-size: 0.86rem;
+      color: #a5d6ff;
+      display: none;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .highlight {
+      color: var(--gold-light);
+      font-weight: 700;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <div>
+        <span id="roleBadge" class="badge">EXPEDIENTE #8419</span>
+      </div>
+      <div class="header-controls">
+        <span id="timerDisplay">00:00</span>
+        <button class="btn btn-secondary" onclick="resetGame()" title="Cambiar de rol o reiniciar">Reiniciar</button>
+      </div>
+    </header>
+
+    <div id="mainContent" class="content">
+      <!-- Renderizado dinámico -->
+    </div>
+  </div>
+
+  <script>
+    // Estado del juego
+    let state = {
+      role: null, // 'P1' (Campo) o 'P2' (Forense)
+      stage: 0,   // 0: Intro, 1..4: Fases, 5: Victoria
+      selectedClue: 0,
+      hintsUsed: 0,
+      startTime: null,
+      timerInterval: null
+    };
+
+    // Sintetizador de audio ligero (sin archivos externos)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+      if (type === 'click') {
+        osc.frequency.setValueAtTime(520, now);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      } else if (type === 'success') {
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(660, now + 0.1);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      } else if (type === 'error') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+    }
+
+    // Base de datos de Fases y Pistas Asimétricas
+    const gameData = {
+      P1: {
+        roleName: "Agente de Campo (Escena)",
+        badgeClass: "role-badge-p1",
+        stages: [
+          null,
+          {
+            title: "Fase 1: El Estudio Cerrado",
+            desc: "Estás dentro del estudio de la Mansión Blackwood. Victor Vance yace junto a su escritorio. Hay un maletín bloqueado con 4 dígitos y pistas que tu compañera en el Laboratorio necesita.",
+            promptLabel: "Código del candado del maletín de Victor (4 dígitos):",
+            answer: "9436",
+            hint: "Dile a la Analista qué símbolo geométrico tiene cada objeto del perchero para que ella te dé el número de casillero de cada uno en el orden de la nota quemada (Vino -> Bastón -> Paraguas -> Maletín).",
+            clues: [
+              {
+                title: "1. Nota quemada",
+                sub: "En el cenicero del escritorio",
+                html: `<h3>Nota en el Cenicero</h3>
+                       <p>Un papel parcialmente quemado con la letra de Victor Vance:</p>
+                       <p><em>"Mi código del maletín sigue el orden exacto en que llegaron mis 4 invitados esta noche:<br>
+                       1° La Dama del Vino<br>
+                       2° El Hombre del Bastón<br>
+                       3° La Joven del Paraguas<br>
+                       4° El Hombre del Maletín"</em></p>`
+              },
+              {
+                title: "2. Perchero del vestíbulo",
+                sub: "Objetos con etiquetas de símbolos",
+                html: `<h3>Perchero de Invitados</h3>
+                       <p>Cada prenda dejada por los invitados tiene colgada una ficha metálica con un símbolo geométrico (pero sin números):</p>
+                       <table class="mono-table">
+                         <tr><th>Objeto dejado</th><th>Ficha Geométrica</th></tr>
+                         <tr><td>Paraguas húmedo</td><td>▲ (Triángulo)</td></tr>
+                         <tr><td>Bastón de plata</td><td>● (Círculo)</td></tr>
+                         <tr><td>Abrigo manchado de vino</td><td>◆ (Rombo)</td></tr>
+                         <tr><td>Maletín de cuero negro</td><td>■ (Cuadrado)</td></tr>
+                       </table>`
+              },
+              {
+                title: "3. Reloj de bolsillo",
+                sub: "Tirado junto al cuerpo",
+                html: `<h3>Reloj de Bolsillo Estrellado</h3>
+                       <p>El reloj de oro de Victor se golpeó al caer y sus manecillas quedaron congeladas marcando exactamente las <span class="highlight">23:18</span>.</p>
+                       <p>En el reverso tiene grabado un código de sincronización policial que podría pedirle la terminal a tu compañera.</p>`
+              }
+            ]
+          },
+          {
+            title: "Fase 2: La Copa Envenenada",
+            desc: "Abres el maletín de Victor. Adentro encuentras un kit químico de emergencia y su agenda privada. Al fondo del estudio hay una caja fuerte que pide el código del veneno usado.",
+            promptLabel: "Código del compuesto letal en la caja fuerte (ej. X000):",
+            answer: "K714",
+            hint: "Describe a la Analista los 3 pasos exactos de la reacción química y el olor de la copa. Además, pásale el PIN de la invitación del color que ella encontró en la basura.",
+            clues: [
+              {
+                title: "1. Reacción en la copa",
+                sub: "Prueba con el kit químico",
+                html: `<h3>Análisis de la Copa de Vino</h3>
+                       <p>Aplicas tres gotas del reactivo al residuo de la copa rota de Victor. Observas la siguiente secuencia:</p>
+                       <ul style="margin-left:18px; color:var(--text);">
+                         <li><strong>Cambio de color:</strong> Se torna <span class="highlight">VIOLETA</span></li>
+                         <li><strong>Vapor:</strong> Emite <span class="highlight">HUMO BLANCO</span></li>
+                         <li><strong>Fondo:</strong> Deja sedimento <span class="highlight">CRISTALINO</span></li>
+                         <li><strong>Olor percibido:</strong> <span class="highlight">ALMENDRAS AMARGAS</span></li>
+                       </ul>`
+              },
+              {
+                title: "2. Agenda de Invitaciones",
+                sub: "PINs médicos por color de sobre",
+                html: `<h3>Agenda Secreta de Victor</h3>
+                       <p>Victor anotó los PINs de acceso a los expedientes privados según el color de invitación que envió a cada sospechoso:</p>
+                       <table class="mono-table">
+                         <tr><th>Color de Invitación</th><th>PIN de Acceso</th></tr>
+                         <tr><td>Dorada</td><td>7710</td></tr>
+                         <tr><td>Plateada</td><td>5082</td></tr>
+                         <tr><td>Carmesí</td><td>3941</td></tr>
+                         <tr><td>Esmeralda</td><td>6205</td></tr>
+                       </table>`
+              }
+            ]
+          },
+          {
+            title: "Fase 3: El Rastro en la Mansión",
+            desc: "La caja fuerte se abre y revela el plano maestro de puertas de la mansión. Para desbloquear la grabadora de voz de Victor necesitas ingresar los 4 dígitos de las puertas/accesos que cruzó el asesino en orden.",
+            promptLabel: "Secuencia de 4 puertas/accesos cruzados por el asesino:",
+            answer: "1849",
+            hint: "Pídele a la Analista que te lea el reporte de sensores infrarrojos. Sigue esa ruta en tu plano de puertas considerando cuál puerta tiene cadena y el pasadizo final.",
+            clues: [
+              {
+                title: "1. Plano de Puertas",
+                sub: "Mapa numérico de la planta baja",
+                html: `<h3>Plano Maestro de Accesos</h3>
+                       <table class="mono-table">
+                         <tr><th>Habitación / Acceso</th><th>Dígito</th><th>Conexiones</th></tr>
+                         <tr><td>Vestíbulo Principal</td><td><strong>1</strong></td><td>Norte: Galería (5) | Este: Comedor (8)</td></tr>
+                         <tr><td>Galería de Arte</td><td><strong>5</strong></td><td>Sur: Vestíbulo (1) | Este: Biblioteca (2)</td></tr>
+                         <tr><td>Comedor</td><td><strong>8</strong></td><td>Oeste: Vestíbulo (1) | Norte: Biblioteca (2) | Este: Invernadero (4)</td></tr>
+                         <tr><td>Biblioteca</td><td><strong>2</strong></td><td>Norte: Estudio de Victor (7)</td></tr>
+                         <tr><td>Invernadero</td><td><strong>4</strong></td><td>Contiene un <strong>Pasadizo Secreto (Dígito 9)</strong> directo al Estudio</td></tr>
+                       </table>`
+              },
+              {
+                title: "2. Inspección de Puertas",
+                sub: "Bloqueos físicos en la escena",
+                html: `<h3>Inspección Física de Cerraduras</h3>
+                       <p>• La puerta directa entre el <strong>Comedor (8) y la Biblioteca (2)</strong> tiene puesta una cadena oxidada por dentro desde la tarde; nadie pudo cruzar por ahí.</p>
+                       <p>• La estantería del Estudio está movida: alguien entró desde el <strong>Invernadero (4)</strong> usando el <strong>Pasadizo Secreto (9)</strong>.</p>`
+              },
+              {
+                title: "3. Huella en el Barro",
+                sub: "Encontrada en el Invernadero",
+                html: `<h3>Huella de Calzado en el Invernadero</h3>
+                       <p>Junto a la entrada del pasadizo secreto hay una pisada fresca muy clara:</p>
+                       <p>• <strong>Medida exacta:</strong> <span class="highlight">27.5 cm</span><br>
+                          • <strong>Diseño de suela:</strong> <span class="highlight">Patrón de Espiga (Herringbone)</span></p>
+                       <p>Comunícale estos dos datos a la Analista para que identifique el ID del sospechoso.</p>`
+              }
+            ]
+          },
+          {
+            title: "Fase 4: La Orden de Arresto",
+            desc: "¡Grabadora desbloqueada! Cruza los últimos hallazgos con tu compañera y emitan juntos la orden de arresto final.",
+            isFinal: true,
+            clues: [
+              {
+                title: "1. Audio de Victor Vance",
+                sub: "Grabado 20 minutos antes de morir",
+                html: `<h3>Grabación de Voz de Victor</h3>
+                       <p><em>"Acabo de descubrir quién vació los fondos de mi fundación médica. Mañana a las 8:00 AM presentaré la denuncia por el desfalco de <strong>$2.4 millones de dólares</strong>. Intentó culpar a mi sobrina Elena dejando su invitación Carmesí en el baño, pero se le cayó su reloj con las iniciales <strong>M.S.</strong> en el pasadizo del invernadero..."</em></p>`
+              }
+            ]
+          }
+        ]
+      },
+
+      P2: {
+        roleName: "Analista Forense (Laboratorio)",
+        badgeClass: "role-badge-p2",
+        stages: [
+          null,
+          {
+            title: "Fase 1: Terminal Forense",
+            desc: "Estás conectada a las cámaras y bases de datos de la Mansión Blackwood. Tu sistema está bloqueado esperando la hora exacta en que se detuvo el reloj de la víctima.",
+            promptLabel: "Hora marcada en el reloj roto de la víctima (4 dígitos HHMM):",
+            answer: "2318",
+            hint: "Pregúntale al Agente de Campo qué hora marca el reloj de bolsillo estrellado junto al cuerpo (formato de 4 números sin dos puntos, ej. 2318).",
+            clues: [
+              {
+                title: "1. Sistema de Casilleros",
+                sub: "Asignación de símbolos geométricos",
+                html: `<h3>Base de Datos del Vestíbulo</h3>
+                       <p>El sistema electrónico del guardarropa asigna un dígito único a cada ficha con símbolo geométrico:</p>
+                       <table class="mono-table">
+                         <tr><th>Ficha Geométrica</th><th>Dígito Asignado</th></tr>
+                         <tr><td>■ (Cuadrado)</td><td><strong>6</strong></td></tr>
+                         <tr><td>▲ (Triángulo)</td><td><strong>3</strong></td></tr>
+                         <tr><td>◆ (Rombo)</td><td><strong>9</strong></td></tr>
+                         <tr><td>● (Círculo)</td><td><strong>4</strong></td></tr>
+                       </table>
+                       <p style="margin-top:8px;">Tu compañero en la escena necesita estos números para abrir el maletín de la víctima.</p>`
+              },
+              {
+                title: "2. Bloqueo de Tiempo",
+                sub: "Requisito del servidor forense",
+                html: `<h3>Protocolo de Sincronización</h3>
+                       <p>Para abrir el catálogo de venenos de la Fase 2, el servidor solicita los <strong>4 dígitos (formato 24h HHMM)</strong> en los que se detuvo el reloj de bolsillo de Victor Vance al caer al piso.</p>`
+              }
+            ]
+          },
+          {
+            title: "Fase 2: Base de Datos Toxicológica",
+            desc: "Acceso concedido al catálogo de toxinas. Ayuda al Agente de Campo a identificar el veneno de la copa, y desbloquea el servidor de sensores ingresando el PIN de la invitación hallada en el baño.",
+            promptLabel: "PIN de 4 dígitos de la invitación hallada en el basurero:",
+            answer: "3941",
+            hint: "Revisa la evidencia 'Sobre en el basurero' aquí mismo para ver de qué color es la invitación, y pídele al Agente de Campo el PIN de ese color según la agenda de Victor.",
+            clues: [
+              {
+                title: "1. Catálogo de Toxinas",
+                sub: "Tabla de reacciones químicas",
+                html: `<h3>Enciclopedia Forense de Venenos</h3>
+                       <p>Compara la reacción que observe tu compañero en la copa rota:</p>
+                       <table class="mono-table">
+                         <tr><th>Código</th><th>Color</th><th>Vapor</th><th>Sedimento / Olor</th></tr>
+                         <tr><td><strong>C-108</strong></td><td>Amarillo</td><td>Sin humo</td><td>Polvo / Almendras amargas</td></tr>
+                         <tr><td><strong>A-309</strong></td><td>Violeta</td><td>Humo Negro</td><td>Ceniza / Tierra húmeda</td></tr>
+                         <tr><td><strong>K-714</strong></td><td>Violeta</td><td>Humo Blanco</td><td>Cristalino / Almendras amargas</td></tr>
+                         <tr><td><strong>V-501</strong></td><td>Violeta</td><td>Humo Blanco</td><td>Cristalino / Inodoro</td></tr>
+                       </table>`
+              },
+              {
+                title: "2. Sobre en el basurero",
+                sub: "Evidencia recuperada del baño",
+                html: `<h3>Evidencia #14: Basurero del Lavabo</h3>
+                       <p>El equipo pericial recuperó guantes de látex con trazas del veneno junto a una invitación rota de color <span class="highlight">CARMESÍ</span>.</p>
+                       <p>Pregúntale al Agente de Campo qué <strong>PIN de 4 dígitos</strong> corresponde a la invitación <strong>Carmesí</strong> en la agenda de Victor.</p>`
+              }
+            ]
+          },
+          {
+            title: "Fase 3: Sensores Infrarrojos y Calzado",
+            desc: "Tienes en pantalla el reporte de movimiento de las 11:35 PM y las tallas de los sospechosos. Ayuda a tu compañero a trazar la ruta numérica del asesino y descubre qué sospechoso dejó la huella en el barro.",
+            promptLabel: "ID del sospechoso dueño de la huella (ej. XX00):",
+            answer: "MS09",
+            hint: "Pregúntale al Agente de Campo cuánto mide la huella en el barro del Invernadero y qué dibujo tiene la suela. Luego ingresa el ID del sospechoso (MS09).",
+            clues: [
+              {
+                title: "1. Sensores Infrarrojos",
+                sub: "Ruta detectada a las 11:35 PM",
+                html: `<h3>Registro de Sensores de Movimiento</h3>
+                       <p>Léale este reporte al Agente de Campo para que él arme el código de 4 puertas:</p>
+                       <p><em>"1° El intruso ingresó por el <strong>Vestíbulo Principal</strong>.<br>
+                       2° No pudo ir al Norte porque los láseres de la Galería de Arte estaban activos, así que caminó hacia el Este al <strong>Comedor</strong>.<br>
+                       3° Intentó abrir la puerta Norte del Comedor pero estaba encadenada, por lo que siguió al Este hacia el <strong>Invernadero</strong>.<br>
+                       4° Desde ahí activó el <strong>Pasadizo Secreto</strong> detrás de la estantería hacia el Estudio."</em></p>`
+              },
+              {
+                title: "2. Registro de Sospechosos",
+                sub: "Calzado registrado en peritaje",
+                html: `<h3>Base de Datos Biométrica y Calzado</h3>
+                       <table class="mono-table">
+                         <tr><th>ID</th><th>Sospechoso</th><th>Talla</th><th>Tipo de Suela</th></tr>
+                         <tr><td><strong>EV-04</strong></td><td>Elena Vance (Sobrina)</td><td>24.0 cm</td><td>Tacón de aguja</td></tr>
+                         <tr><td><strong>MS-09</strong></td><td>Dr. Marcus Sterling (Socio)</td><td>27.5 cm</td><td>Patrón de Espiga</td></tr>
+                         <tr><td><strong>JT-02</strong></td><td>Julian Thorne (Curador)</td><td>27.5 cm</td><td>Suela Lisa Italiana</td></tr>
+                         <tr><td><strong>CM-07</strong></td><td>Clara Méndez (Ama de llaves)</td><td>25.0 cm</td><td>Goma Antideslizante</td></tr>
+                       </table>`
+              }
+            ]
+          },
+          {
+            title: "Fase 4: La Orden de Arresto",
+            desc: "¡Expediente bancario desencriptado! Cruza tu información con el Agente de Campo y completen juntos la acusación formal.",
+            isFinal: true,
+            clues: [
+              {
+                title: "1. Rastreo Bancario",
+                sub: "Transferencias de la Fundación",
+                html: `<h3>Auditoría Forense Financiera</h3>
+                       <p>• Se detectó un desvío ilegal por <strong>$2.4 millones de dólares</strong> desde la Fundación Vance hacia una cuenta en Islas Caimán a nombre del <strong>Dr. Marcus Sterling (MS-09)</strong>.</p>
+                       <p>• Además, la clínica privada del Dr. Sterling registró la compra del compuesto <strong>K-714 (Kalmia Nocturna)</strong> hace 72 horas.</p>`
+              }
+            ]
+          }
+        ]
+      }
+    };
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function startTimer() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.startTime = Date.now();
+      state.timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+        document.getElementById('timerDisplay').textContent = formatTime(elapsed);
+      }, 1000);
+    }
+
+    function selectRole(role) {
+      playSound('click');
+      state.role = role;
+      state.stage = 1;
+      state.selectedClue = 0;
+      startTimer();
+      render();
+    }
+
+    function selectClue(idx) {
+      playSound('click');
+      state.selectedClue = idx;
+      render();
+    }
+
+    function showHint() {
+      playSound('click');
+      const box = document.getElementById('hintBox');
+      if (box) {
+        if (box.style.display !== 'block') state.hintsUsed++;
+        box.style.display = 'block';
+      }
+    }
+
+    function checkStageCode() {
+      const input = document.getElementById('codeInput');
+      const feedback = document.getElementById('feedbackMsg');
+      if (!input) return;
+
+      const cleanInput = input.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const currentStageObj = gameData[state.role].stages[state.stage];
+
+      if (cleanInput === currentStageObj.answer) {
+        playSound('success');
+        feedback.className = 'feedback success';
+        feedback.textContent = '¡Código verificado! Avanzando a la siguiente fase...';
+        setTimeout(() => {
+          state.stage++;
+          state.selectedClue = 0;
+          render();
+        }, 900);
+      } else {
+        playSound('error');
+        feedback.className = 'feedback error';
+        feedback.textContent = 'Código incorrecto. Verifica los datos con tu pareja.';
+      }
+    }
+
+    function submitFinalArrest() {
+      const s1 = document.getElementById('finalSuspect').value;
+      const s2 = document.getElementById('finalPoison').value;
+      const s3 = document.getElementById('finalRoute').value;
+      const s4 = document.getElementById('finalMotive').value;
+      const feedback = document.getElementById('feedbackMsg');
+
+      if (s1 === 'MS09' && s2 === 'K714' && s3 === '1849' && s4 === '24M') {
+        playSound('success');
+        clearInterval(state.timerInterval);
+        state.stage = 5;
+        render();
+      } else {
+        playSound('error');
+        feedback.className = 'feedback error';
+        feedback.textContent = 'Alguno de los datos del arresto no coincide con las pruebas. Revisen juntos.';
+      }
+    }
+
+    function resetGame() {
+      playSound('click');
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state = { role: null, stage: 0, selectedClue: 0, hintsUsed: 0, startTime: null, timerInterval: null };
+      document.getElementById('timerDisplay').textContent = '00:00';
+      render();
+    }
+
+    function render() {
+      const container = document.getElementById('mainContent');
+      const badge = document.getElementById('roleBadge');
+
+      if (!state.role) {
+        badge.className = 'badge';
+        badge.textContent = 'EXPEDIENTE #8419';
+        container.innerHTML = `
+          <h1>El Caso de la Mansión Blackwood</h1>
+          <p>A las 11:45 PM, el magnate Victor Vance fue hallado sin vida en su estudio cerrado. Para resolver el homicidio, uno de ustedes debe entrar a la escena del crimen y el otro operar el laboratorio forense desde su propia pantalla.</p>
+          <div class="inspector-box">
+            <h3>Instrucciones para jugar en pareja</h3>
+            <p style="margin-bottom:0;">Cada jugador debe abrir este juego en su propio dispositivo y elegir un rol distinto. <strong>No miren la pantalla del otro:</strong> tendrán que describirse pistas, símbolos y reportes en voz alta para deducir los códigos de las 4 fases.</p>
+          </div>
+          <h2>Elige tu Rol en esta Pantalla:</h2>
+          <div class="role-grid">
+            <button class="role-card p1" onclick="selectRole('P1')">
+              <span class="role-icon">🔦</span>
+              <span class="role-title">Jugador 1: Agente de Campo</span>
+              <p style="margin:0; font-size:0.85rem;">Inspecciona el cuerpo, las cerraduras, las reacciones químicas y los objetos físicos en el estudio.</p>
+            </button>
+            <button class="role-card p2" onclick="selectRole('P2')">
+              <span class="role-icon">🔬</span>
+              <span class="role-title">Jugador 2: Analista Forense</span>
+              <p style="margin:0; font-size:0.85rem;">Opera las bases de datos de toxinas, sensores infrarrojos, casilleros y registros bancarios.</p>
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const roleData = gameData[state.role];
+      badge.className = `badge ${roleData.badgeClass}`;
+      badge.textContent = roleData.roleName;
+
+      if (state.stage === 5) {
+        const totalTime = document.getElementById('timerDisplay').textContent;
+        container.innerHTML = `
+          <div style="text-align:center; padding: 16px 0;">
+            <div style="font-size:3.2rem; margin-bottom:10px;">🚓</div>
+            <h1>¡Caso Resuelto con Éxito!</h1>
+            <p>El <strong>Dr. Marcus Sterling</strong> ha sido arrestado antes de abordar su vuelo privado. Intentó envenenar a Victor Vance con <strong>Kalmia Nocturna (K-714)</strong> entrando por el pasadizo del invernadero e inculpar a Elena Vance dejando su invitación Carmesí en el baño.</p>
+            <div class="inspector-box" style="text-align:left;">
+              <h3>Resumen del Operativo</h3>
+              <p>• <strong>Rol jugado en este dispositivo:</strong> ${roleData.roleName}<br>
+                 • <strong>Tiempo total de investigación:</strong> <span class="highlight">${totalTime}</span><br>
+                 • <strong>Pistas de la central solicitadas:</strong> ${state.hintsUsed}<br>
+                 • <strong>Rango de la pareja:</strong> ${state.hintsUsed === 0 ? 'Detectives Maestro (Sin pistas)' : 'Inspectores de Primera Línea'}</p>
+            </div>
+            <button class="btn" onclick="resetGame()">Jugar de Nuevo / Cambiar de Rol</button>
+          </div>
+        `;
+        return;
+      }
+
+      const st = roleData.stages[state.stage];
+      let progressHtml = `<div class="progress-bar">`;
+      for (let i = 1; i <= 4; i++) {
+        const cls = i < state.stage ? 'done' : (i === state.stage ? 'active' : '');
+        progressHtml += `<div class="progress-step ${cls}"></div>`;
+      }
+      progressHtml += `</div>`;
+
+      let cluesBtns = `<div class="evidence-grid">`;
+      st.clues.forEach((c, idx) => {
+        const sel = idx === state.selectedClue ? 'selected' : '';
+        cluesBtns += `
+          <button class="evidence-btn ${sel}" onclick="selectClue(${idx})">
+            <strong>${c.title}</strong>
+            <span>${c.sub}</span>
+          </button>
+        `;
+      });
+      cluesBtns += `</div>`;
+
+      const currentClueHtml = st.clues[state.selectedClue].html;
+
+      let bottomActionHtml = '';
+      if (!st.isFinal) {
+        bottomActionHtml = `
+          <div class="unlock-panel">
+            <label for="codeInput">${st.promptLabel}</label>
+            <div class="input-row">
+              <input type="text" id="codeInput" placeholder="INGRESA EL CÓDIGO..." autocomplete="off" onkeydown="if(event.key==='Enter') checkStageCode()" />
+              <button class="btn" onclick="checkStageCode()">Desbloquear</button>
+            </div>
+            <div id="feedbackMsg" class="feedback"></div>
+            <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+              <button class="btn btn-secondary" onclick="showHint()">¿Atorados? Pedir pista</button>
+              <span style="font-size:0.78rem; color:var(--text-muted);">Fase ${state.stage} de 4</span>
+            </div>
+            <div id="hintBox" class="hint-box">${st.hint}</div>
+          </div>
+        `;
+      } else {
+        bottomActionHtml = `
+          <div class="unlock-panel">
+            <h2 style="margin-bottom:14px;">Emitir Orden de Arresto Conjunta</h2>
+            <div class="form-group">
+              <label>1. ¿Quién es el asesino de Victor Vance?</label>
+              <select id="finalSuspect">
+                <option value="">-- Selecciona al culpable --</option>
+                <option value="EV04">Elena Vance (Sobrina)</option>
+                <option value="MS09">Dr. Marcus Sterling (Socio médico)</option>
+                <option value="JT02">Julian Thorne (Curador de arte)</option>
+                <option value="CM07">Clara Méndez (Ama de llaves)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>2. ¿Qué compuesto se utilizó en la copa de vino?</label>
+              <select id="finalPoison">
+                <option value="">-- Selecciona la toxina --</option>
+                <option value="C108">C-108 (Cianuro Potásico)</option>
+                <option value="A309">A-309 (Acónito Imperial)</option>
+                <option value="K714">K-714 (Kalmia Nocturna)</option>
+                <option value="V501">V-501 (Atropina Destilada)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>3. ¿Qué secuencia de accesos usó para entrar al Estudio?</label>
+              <select id="finalRoute">
+                <option value="">-- Selecciona la ruta --</option>
+                <option value="1527">1527 (Vestíbulo - Galería - Biblioteca - Estudio)</option>
+                <option value="1827">1827 (Vestíbulo - Comedor - Biblioteca - Estudio)</option>
+                <option value="1849">1849 (Vestíbulo - Comedor - Invernadero - Pasadizo)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>4. ¿Cuál fue el móvil del homicidio?</label>
+              <select id="finalMotive">
+                <option value="">-- Selecciona el móvil --</option>
+                <option value="HERENCIA">Cobrar el seguro de vida y la herencia familiar</option>
+                <option value="24M">Silenciar la denuncia por el desfalco de $2.4 millones</option>
+                <option value="ARTE">Robar la colección privada de pinturas</option>
+              </select>
+            </div>
+            <button class="btn" style="width:100%; margin-top:6px;" onclick="submitFinalArrest()">Firmar y Ejecutar Orden de Arresto</button>
+            <div id="feedbackMsg" class="feedback"></div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        ${progressHtml}
+        <h2>${st.title}</h2>
+        <p>${st.desc}</p>
+        ${cluesBtns}
+        <div class="inspector-box">
+          ${currentClueHtml}
+        </div>
+        ${bottomActionHtml}
+      `;
+    }
+
+    // Inicializar vista
+    render();
+  </script>
+</body>
+</html>
